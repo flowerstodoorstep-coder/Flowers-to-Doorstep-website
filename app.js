@@ -40,14 +40,18 @@ db.ref('products').once('value', snapshot => {
     }
 });
 
-// Live Inventory Sync
+// Live Inventory Sync (Bulletproof Array Conversion)
 db.ref('products').on('value', snapshot => {
     if (snapshot.exists()) {
-        products = snapshot.val();
+        const rawData = snapshot.val();
+        // Safely convert to a clean array even if Firebase turns it into an object
+        products = Array.isArray(rawData) ? rawData : Object.values(rawData);
+        
         renderProducts();
         if (isOwnerAuthenticated && currentView === 'owner') showOwnerDashboard();
     }
 });
+
 
 // Live Orders Sync Engine
 db.ref('orders').on('value', snapshot => {
