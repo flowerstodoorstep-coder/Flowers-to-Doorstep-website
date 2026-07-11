@@ -48,23 +48,27 @@
             <!-- Dashboard Content -->
             <div id="owner-dashboard" class="hidden space-y-8">
                 
-                <!-- Section 1: Add New Product to Catalog -->
+                <!-- Section 1: Add New Product to Catalog (FIXED INTERACTION WRAPPER) -->
                 <div class="bg-slate-950/60 p-4 rounded-xl border border-white/10">
                     <h2 class="text-lg font-black text-amber-400 mb-4 tracking-wider uppercase">➕ Add New Product to Catalog</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                        <input type="text" id="new-prod-name" placeholder="Product Name (e.g., Red Lotus)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400">
-                        <select id="new-prod-category" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-gray-300">
-                            <option value="garlands">Garlands</option>
-                            <option value="loose flowers">Loose Flowers</option>
-                            <option value="others">Others</option>
-                        </select>
-                        <input type="number" id="new-prod-price" placeholder="Price (₹)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400">
-                        <input type="text" id="new-prod-unit" placeholder="Unit (e.g., 1 mura / 100g)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400">
-                        <input type="number" id="new-prod-stock" placeholder="Initial Stock Qty" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400">
-                        <input type="text" id="new-prod-img" placeholder="Image URL address" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400">
-                        <input type="text" id="new-prod-desc" placeholder="Short description..." class="sm:col-span-3 bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400">
-                    </div>
-                    <button onclick="addNewProduct()" type="button" class="mt-3 w-full bg-emerald-500 hover:bg-emerald-600 text-white py-2 rounded-lg font-bold text-xs uppercase tracking-widest transition shadow-lg block">Save Product to Live Database</button>
+                    <form id="new-product-form" onsubmit="event.preventDefault(); window.addNewProduct(); return false;" class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                            <input type="text" id="new-prod-name" placeholder="Product Name (e.g., Red Lotus)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white" required>
+                            <select id="new-prod-category" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-gray-300">
+                                <option value="garlands">Garlands</option>
+                                <option value="loose flowers">Loose Flowers</option>
+                                <option value="others">Others</option>
+                            </select>
+                            <input type="number" id="new-prod-price" placeholder="Price (₹)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white" required>
+                            <input type="text" id="new-prod-unit" placeholder="Unit (e.g., 1 mura / 100g)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white" required>
+                            <input type="number" id="new-prod-stock" placeholder="Initial Stock Qty" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white" required>
+                            <input type="text" id="new-prod-img" placeholder="Image URL address" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                            <input type="text" id="new-prod-desc" placeholder="Short description..." class="sm:col-span-3 bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition shadow-lg block cursor-pointer active:scale-95">
+                            Save Product to Live Database
+                        </button>
+                    </form>
                 </div>
 
                 <!-- Section 2: Catalog & Stock Modifier Table -->
