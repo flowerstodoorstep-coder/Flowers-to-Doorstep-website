@@ -2,7 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyCG9PiY1pdZKm0-Z9raOWQfx8k3YL50n4k",
   authDomain: "flowers-to-doorstep.firebaseapp.com",
-  databaseURL: "https://flowers-to-doorstep-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  databaseURL: "https://flowers-to-step-default-rtdb.asia-southeast1.firebasedatabase.app/",
   projectId: "flowers-to-doorstep",
   storageBucket: "flowers-to-doorstep.firebasestorage.app",
   messagingSenderId: "849984447371",
@@ -205,7 +205,18 @@ function validateAreaSelection() {
 function submitOrder() {
     const area = document.getElementById('delivery-area').value;
     const address = document.getElementById('delivery-address').value;
+    const name = document.getElementById('customer-name').value;
+    const phone = document.getElementById('customer-phone').value;
 
+    // Form Field Validations
+    if (!name.trim()) {
+        alert('⚠️ Please enter your name.');
+        return;
+    }
+    if (!phone.trim() || phone.length < 10) {
+        alert('⚠️ Please enter a valid 10-digit WhatsApp number.');
+        return;
+    }
     if (area === 'outside') {
         alert('❌ Error: Delivery is restricted to Gowlidoddi.');
         return;
@@ -216,35 +227,69 @@ function submitOrder() {
     }
 
     let subtotal = 0;
+    let whatsappOrderList = ""; 
+
     const orderItems = Object.entries(cart).map(([id, qty]) => {
         const prod = products.find(p => p && p.id === parseInt(id));
         subtotal += prod.price * qty;
         prod.stock = Math.max(0, prod.stock - qty);
+        
+        // Formats WhatsApp Line items clearly
+        whatsappOrderList += `- ${prod.name} ${prod.unit.split(' ')[0]} x ${qty} = ₹${prod.price * qty}\n`;
+        
         return { name: prod.name, qty: qty, price: prod.price };
     });
 
     const finalFee = subtotal < 200 ? 20 : 0;
+    const finalTotal = subtotal + finalFee;
 
     const orderData = {
+        name: name,
+        phone: phone,
         items: orderItems,
         address: address,
         subtotal: subtotal,
         deliveryFee: finalFee,
-        total: subtotal + finalFee,
+        total: finalTotal,
         timestamp: new Date().toLocaleString()
     };
 
-    // Push new order directly into database
+    // 1. Push order data directly into Firebase real-time database
     db.ref('orders').push(orderData).then(() => {
-        // Update live database stocks
         db.ref('products').set(products);
-        alert('🎉 Order placed successfully! The owner has been notified.');
+        
+        // 2. Generate text layout parameters for WhatsApp structure
+        const whatsappMessage = 
+`New Order - Flowers To Doorstep
+
+Name: ${name}
+Phone: ${phone}
+Address: ${address}
+
+Order:
+${whatsappOrderList}
+Total: ₹${finalTotal}`;
+
+        // 3. Launch WhatsApp link engine (Replace with your actual business phone number)
+        const ownerWhatsAppNumber = "91XXXXXXXXXX"; 
+        const encodedText = encodeURIComponent(whatsappMessage);
+        const whatsappURL = `https://api.whatsapp.com/send?phone=${ownerWhatsAppNumber}&text=${encodedText}`;
+
+        alert('🎉 Order processed successfully! Redirecting to WhatsApp to send your summary message...');
+        
+        // Reset local cart and forms
         cart = {};
+        document.getElementById('customer-name').value = '';
+        document.getElementById('customer-phone').value = '';
         document.getElementById('delivery-address').value = '';
         selectedCategory = null;
         document.getElementById('bg-image').className = "fixed inset-0 bg-cover bg-center transition-all duration-700 ease-in-out z-0 scale-100 opacity-100";
+        
         updateNavUI();
         updateCartDrawer();
+
+        // Direct user tab to WhatsApp messaging application
+        window.open(whatsappURL, '_blank');
     });
 }
 
@@ -270,7 +315,7 @@ function toggleView() {
 
 function verifyOwnerPassword() {
     const inputPass = document.getElementById('owner-password').value;
-    if (inputPass === 'admin123') { // Replace with your custom private passkey if needed
+    if (inputPass === 'admin123') { 
         isOwnerAuthenticated = true;
         document.getElementById('owner-auth').classList.replace('block', 'hidden');
         showOwnerDashboard();
@@ -312,7 +357,6 @@ function renderOrderHistory(ordersData) {
         return;
     }
 
-    // Render backwards to keep newest entries on top
     Object.values(ordersData).reverse().forEach(order => {
         const div = document.createElement('div');
         div.className = "bg-slate-950 border border-white/10 rounded-xl p-4 space-y-2 shadow-inner border-l-4 border-l-emerald-500 animate-fadeIn";
@@ -324,9 +368,9 @@ function renderOrderHistory(ordersData) {
                 <span>📅 ${order.timestamp}</span>
                 <span class="text-emerald-400 font-bold font-mono">Total: ₹${order.total}</span>
             </div>
-            <div class="text-sm font-bold text-white">📍 Address: ${order.address}, Gowlidoddi</div>
-            <ul class="space-y-1 bg-white/5 p-2 rounded-lg">${itemsList}</ul>
-            <div class="text-[10px] text-gray-500">Subtotal: ₹${order.subtotal} | Delivery Fee: ₹${order.deliveryFee}</div>
+            <div class="text-sm font-bold text-white">👤 ${order.name || 'Customer'} (${order.phone || 'N/A'})</div>
+            <div class="text-xs text-gray-300">📍 Address: ${order.address}, Gowlidoddi</div>
+            <ul class="space-y-1 bg-white/5 p-2 rounded-lg mt-1">${itemsList}</ul>
         `;
         container.appendChild(div);
     });
