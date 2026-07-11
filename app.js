@@ -45,7 +45,7 @@ db.ref('catalog').on('value', snap => {
         const data = snap.val();
         if (data) {
             products = Object.keys(data)
-                .filter(key => data[key] !== null && data[key] !== undefined) // Safe check to prevent crashing on null elements
+                .filter(key => data[key] !== null && data[key] !== undefined)
                 .map(key => {
                     const item = data[key];
                     return { id: key, ...item };
@@ -359,7 +359,7 @@ window.addNewProduct = function() {
             return;
         }
 
-        const uniqueId = "prod_" + Date.now().toString(); // Use a string prefix to prevent Firebase from interpreting it as an index array
+        const uniqueId = "prod_" + Date.now().toString(); 
         const cleanPayload = {
             id: uniqueId,
             name: name,
