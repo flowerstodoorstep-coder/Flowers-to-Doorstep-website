@@ -17,11 +17,11 @@ if (!firebase.apps.length) {
 const db = firebase.database();
 
 const FALLBACK_SEEDS = [
-    { id: "1", name: 'Rose', price: 80, unit: '100 grams loose', category: 'loose flowers', stock: 15, desc: 'Fresh bright red aromatic loose roses for daily pooja arrangements.', img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400' },
-    { id: "2", name: 'White Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 5, desc: 'Crisp handpicked traditional white chrysanthemums.', img: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=400' },
-    { id: "3", name: 'Yellow Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 12, desc: 'Bright yellow auspicious blooms ideal for home decoration festive setups.', img: 'https://images.unsplash.com/photo-1596436889106-be35e843f974?q=80&w=400' },
-    { id: "4", name: 'Small Jasmine Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 8, desc: 'Sana Jaji thin-spun tight weave fragrant garland strands.', img: 'https://images.unsplash.com/photo-1546842931-886c185b4c8c?q=80&w=400' },
-    { id: "5", name: 'Shevanti Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 4, desc: 'Dense thick yellow chrysanthemums woven tightly for deity frames.', img: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?q=80&w=400' }
+    { id: "prod_1", name: 'Rose', price: 80, unit: '100 grams loose', category: 'loose flowers', stock: 15, desc: 'Fresh bright red aromatic loose roses for daily pooja arrangements.', img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400' },
+    { id: "prod_2", name: 'White Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 5, desc: 'Crisp handpicked traditional white chrysanthemums.', img: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=400' },
+    { id: "prod_3", name: 'Yellow Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 12, desc: 'Bright yellow auspicious blooms ideal for home decoration festive setups.', img: 'https://images.unsplash.com/photo-1596436889106-be35e843f974?q=80&w=400' },
+    { id: "prod_4", name: 'Small Jasmine Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 8, desc: 'Sana Jaji thin-spun tight weave fragrant garland strands.', img: 'https://images.unsplash.com/photo-1546842931-886c185b4c8c?q=80&w=400' },
+    { id: "prod_5", name: 'Shevanti Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 4, desc: 'Dense thick yellow chrysanthemums woven tightly for deity frames.', img: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?q=80&w=400' }
 ];
 
 let products = [];
@@ -39,12 +39,25 @@ db.ref('catalog').once('value', snap => {
     }
 });
 
-// Live Synchronized Inventory Listener
+// Live Synchronized Inventory Listener with CRASH PROTECTION
 db.ref('catalog').on('value', snap => {
-    const data = snap.val();
-    products = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
-    renderProducts();
-    if (isOwnerAuthenticated && currentView === 'owner') showOwnerDashboard();
+    try {
+        const data = snap.val();
+        if (data) {
+            products = Object.keys(data)
+                .filter(key => data[key] !== null && data[key] !== undefined) // Safe check to prevent crashing on null elements
+                .map(key => {
+                    const item = data[key];
+                    return { id: key, ...item };
+                });
+        } else {
+            products = [];
+        }
+        renderProducts();
+        if (isOwnerAuthenticated && currentView === 'owner') showOwnerDashboard();
+    } catch (e) {
+        console.error("Data Sync Error Caught: ", e);
+    }
 });
 
 // Order Log Syncer Engine
@@ -60,7 +73,7 @@ setTimeout(() => {
     if(bg) bg.style.backgroundImage = "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200')";
 }, 500);
 
-function selectCategory(category) {
+window.selectCategory = function(category) {
     selectedCategory = (selectedCategory === category) ? null : category;
     const bg = document.getElementById('bg-image');
     if (bg) {
@@ -70,7 +83,7 @@ function selectCategory(category) {
     }
     updateNavUI();
     renderProducts();
-}
+};
 
 function updateNavUI() {
     ['garlands', 'loose', 'others'].forEach(id => {
@@ -138,7 +151,7 @@ function renderProducts() {
     });
 }
 
-function addToCart(productId, change) {
+window.addToCart = function(productId, change) {
     const item = products.find(p => p && p.id === productId);
     const currentQty = cart[productId] || 0;
     const targetQty = currentQty + change;
@@ -153,7 +166,7 @@ function addToCart(productId, change) {
 
     renderProducts();
     updateCartDrawer();
-}
+};
 
 function updateCartDrawer() {
     const drawer = document.getElementById('cart-drawer');
@@ -196,7 +209,7 @@ function updateCartDrawer() {
     validateAreaSelection();
 }
 
-function validateAreaSelection() {
+window.validateAreaSelection = function() {
     const area = document.getElementById('delivery-area').value;
     const btn = document.getElementById('checkout-btn');
     const addressInput = document.getElementById('delivery-address');
@@ -210,9 +223,9 @@ function validateAreaSelection() {
         btn.className = "w-full sm:w-auto bg-amber-400 hover:bg-amber-500 text-slate-950 px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg";
         addressInput.disabled = false;
     }
-}
+};
 
-function submitOrder() {
+window.submitOrder = function() {
     const area = document.getElementById('delivery-area').value;
     const address = document.getElementById('delivery-address').value;
     const name = document.getElementById('customer-name').value;
@@ -259,9 +272,9 @@ function submitOrder() {
         updateCartDrawer();
         window.open(`https://api.whatsapp.com/send?phone=91XXXXXXXXXX&text=${encodeURIComponent(textPayload)}`, '_blank');
     });
-}
+};
 
-function toggleView() {
+window.toggleView = function() {
     const customerView = document.getElementById('customer-view');
     const ownerView = document.getElementById('owner-view');
     const toggleBtn = document.getElementById('view-toggle-btn');
@@ -279,9 +292,9 @@ function toggleView() {
         ownerView.classList.replace('block', 'hidden');
         toggleBtn.innerText = 'Switch to Owner Panel';
     }
-}
+};
 
-function verifyOwnerPassword() {
+window.verifyOwnerPassword = function() {
     const inputPass = document.getElementById('owner-password').value;
     if (inputPass === 'admin123') { 
         isOwnerAuthenticated = true;
@@ -291,7 +304,7 @@ function verifyOwnerPassword() {
     } else {
         alert('❌ Security Credentials Invalid!');
     }
-}
+};
 
 function showOwnerDashboard() {
     const dashboard = document.getElementById('owner-dashboard');
@@ -323,7 +336,6 @@ function showOwnerDashboard() {
     });
 }
 
-// BIND GLOBAL LOGIC SAFELY INTO THE GLOBAL WINDOW FOR IMMEDIATE MOBILE ACCESS
 window.addNewProduct = function() {
     try {
         const nameEl = document.getElementById('new-prod-name');
@@ -347,7 +359,7 @@ window.addNewProduct = function() {
             return;
         }
 
-        const uniqueId = Date.now().toString();
+        const uniqueId = "prod_" + Date.now().toString(); // Use a string prefix to prevent Firebase from interpreting it as an index array
         const cleanPayload = {
             id: uniqueId,
             name: name,
@@ -377,15 +389,15 @@ window.addNewProduct = function() {
     }
 };
 
-function updateProductField(productId, field, value) {
+window.updateProductField = function(productId, field, value) {
     db.ref(`catalog/${productId}/${field}`).set(value);
-}
+};
 
-function deleteProduct(productId) {
+window.deleteProduct = function(productId) {
     if (confirm('🗑️ Remove this item from database?')) {
         db.ref(`catalog/${productId}`).remove();
     }
-}
+};
 
 function renderOrderHistory(ordersData) {
     const container = document.getElementById('orders-history-container');
