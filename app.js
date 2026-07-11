@@ -11,7 +11,9 @@ const firebaseConfig = {
 };
 
 // Initialize Instance Runtime
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const db = firebase.database();
 
 const FALLBACK_SEEDS = [
@@ -37,11 +39,10 @@ db.ref('catalog').once('value', snap => {
     }
 });
 
-// Live Synchronized Inventory Listener (Resolves Array vs Object conversion issue)
+// Live Synchronized Inventory Listener
 db.ref('catalog').on('value', snap => {
     const data = snap.val();
     if (data) {
-        // Map elements into a structured local data list array safely
         products = Object.keys(data).map(key => ({
             id: key,
             ...data[key]
@@ -61,7 +62,10 @@ db.ref('orders').on('value', snap => {
 });
 
 // Load App Wallpaper
-document.getElementById('bg-image').style.backgroundImage = "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200')";
+setTimeout(() => {
+    const bg = document.getElementById('bg-image');
+    if(bg) bg.style.backgroundImage = "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200')";
+}, 500);
 
 function selectCategory(category) {
     if (selectedCategory === category) {
@@ -78,6 +82,7 @@ function selectCategory(category) {
 function updateNavUI() {
     ['garlands', 'loose', 'others'].forEach(id => {
         const btn = document.getElementById(`btn-${id}`);
+        if (!btn) return;
         const catName = id === 'loose' ? 'loose flowers' : id;
         if (selectedCategory === catName) {
             btn.className = "flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 bg-amber-400 text-slate-950 shadow-lg";
@@ -89,6 +94,7 @@ function updateNavUI() {
 
 function renderProducts() {
     const container = document.getElementById('products-container');
+    if(!container) return;
     container.innerHTML = '';
     
     if (!selectedCategory) {
@@ -161,6 +167,7 @@ function addToCart(productId, change) {
 function updateCartDrawer() {
     const drawer = document.getElementById('cart-drawer');
     const itemsContainer = document.getElementById('cart-items');
+    if(!itemsContainer || !drawer) return;
     itemsContainer.innerHTML = '';
 
     let subtotal = 0;
@@ -182,13 +189,15 @@ function updateCartDrawer() {
     drawer.classList.remove('hidden');
 
     const promoBanner = document.getElementById('promo-banner');
-    if (subtotal < 200) {
-        const remaining = 200 - subtotal;
-        promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-amber-500/10 border border-amber-500/30 text-amber-300";
-        promoBanner.innerHTML = `🛒 Your subtotal is ₹${subtotal}. <span class="underline font-bold text-amber-400">Add ₹${remaining} more</span> for FREE delivery!`;
-    } else {
-        promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
-        promoBanner.innerHTML = `🎉 Splendid! Your order qualifies for Free Doorstep Delivery.`;
+    if (promoBanner) {
+        if (subtotal < 200) {
+            const remaining = 200 - subtotal;
+            promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-amber-500/10 border border-amber-500/30 text-amber-300";
+            promoBanner.innerHTML = `🛒 Your subtotal is ₹${subtotal}. <span class="underline font-bold text-amber-400">Add ₹${remaining} more</span> for FREE delivery!`;
+        } else {
+            promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
+            promoBanner.innerHTML = `🎉 Splendid! Your order qualifies for Free Doorstep Delivery.`;
+        }
     }
 
     const fee = (subtotal < 200) ? 20 : 0;
@@ -208,7 +217,7 @@ function validateAreaSelection() {
         addressInput.disabled = true;
     } else {
         btn.innerText = 'PLACE ORDER & SEND WHATSAPP';
-        btn.className = "w-full sm:w-auto bg-amber-400 hover:bg-amber-500 text-slate-950 px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg animate-bounce";
+        btn.className = "w-full sm:w-auto bg-amber-400 hover:bg-amber-500 text-slate-950 px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg";
         addressInput.disabled = false;
     }
 }
@@ -229,7 +238,6 @@ function submitOrder() {
     const updates = {};
     const orderItems = [];
 
-    // Loop data checking and setup deductions
     for (const [id, qty] of Object.entries(cart)) {
         const prod = products.find(p => p && p.id === id);
         if (!prod) continue;
@@ -241,8 +249,6 @@ function submitOrder() {
 
         subtotal += Number(prod.price) * qty;
         const netStockLeft = currentStock - qty;
-        
-        // Build database update path string reference 
         updates[`/catalog/${id}/stock`] = netStockLeft;
         
         whatsappOrderList += `- ${prod.name} (${prod.unit}) x ${qty} = ₹${Number(prod.price) * qty}\n`;
@@ -263,13 +269,9 @@ function submitOrder() {
         timestamp: new Date().toLocaleString()
     };
 
-    // 1. Direct Atomic Multi-Node Stock Level Reductions on Firebase Master Account
     db.ref().update(updates).then(() => {
-        
-        // 2. Archive record entry logs to database history branch
         db.ref('orders').push(logOrderData);
 
-        // 3. Stringify layout schema mapping template for clean payload execution
         const textPayload = 
 `New Order - Flowers To Doorstep
 
@@ -285,13 +287,11 @@ Subtotal: ₹${subtotal}
 Delivery: ${finalFee > 0 ? `₹${finalFee}` : 'FREE'}
 *Total Amount Payable: ₹${finalTotal}*`;
 
-        // 4. Fire application redirect link mapping engine
-        const targetBusinessNumber = "91XXXXXXXXXX"; // Put your actual WhatsApp contact string here
+        const targetBusinessNumber = "91XXXXXXXXXX"; 
         const targetURL = `https://api.whatsapp.com/send?phone=${targetBusinessNumber}&text=${encodeURIComponent(textPayload)}`;
 
-        alert('🎉 Order logged on dashboard & stock deducted! Opening WhatsApp to forward summary verification...');
+        alert('🎉 Order logged on dashboard & stock deducted! Opening WhatsApp...');
         
-        // Clear runtime state counters
         cart = {};
         document.getElementById('customer-name').value = '';
         document.getElementById('customer-phone').value = '';
@@ -301,14 +301,12 @@ Delivery: ${finalFee > 0 ? `₹${finalFee}` : 'FREE'}
         
         updateNavUI();
         updateCartDrawer();
-
         window.open(targetURL, '_blank');
     }).catch(err => {
         alert("❌ Order Transmission Failed: " + err.message);
     });
 }
 
-// OWNER UTILITY MANAGEMENT MECHANICS
 function toggleView() {
     const customerView = document.getElementById('customer-view');
     const ownerView = document.getElementById('owner-view');
@@ -343,6 +341,7 @@ function verifyOwnerPassword() {
 function showOwnerDashboard() {
     document.getElementById('owner-dashboard').classList.remove('hidden');
     const tbody = document.getElementById('admin-table-body');
+    if(!tbody) return;
     tbody.innerHTML = '';
 
     products.forEach(p => {
@@ -353,7 +352,7 @@ function showOwnerDashboard() {
             <td class="p-3">
                 <div class="font-bold text-white">${p.name}</div>
                 <div class="text-xs text-amber-400 font-semibold mb-1">${p.unit}</div>
-                <input type="text" value="${p.desc || ''}" onchange="updateProductField('${p.id}', 'desc', this.value)" placeholder="Add short line description description..." class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:border-amber-400 focus:outline-none">
+                <input type="text" value="${p.desc || ''}" onchange="updateProductField('${p.id}', 'desc', this.value)" placeholder="Add description..." class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:border-amber-400 focus:outline-none">
             </td>
             <td class="p-3">
                 <input type="number" value="${p.price}" onchange="updateProductField('${p.id}', 'price', Number(this.value))" class="w-20 bg-slate-950 border border-white/10 rounded p-1.5 font-bold text-center text-emerald-400 focus:border-amber-400 focus:outline-none">
@@ -368,15 +367,25 @@ function showOwnerDashboard() {
     });
 }
 
+// ULTRA-SAFE BACKEND PRODUCT Uploader
 function addNewProduct() {
     try {
-        const name = document.getElementById('new-prod-name').value.trim();
-        const category = document.getElementById('new-prod-category').value;
-        const price = document.getElementById('new-prod-price').value;
-        const unit = document.getElementById('new-prod-unit').value.trim();
-        const stock = document.getElementById('new-prod-stock').value;
-        const img = document.getElementById('new-prod-img').value.trim();
-        const desc = document.getElementById('new-prod-desc') ? document.getElementById('new-prod-desc').value.trim() : '';
+        // Safe elements selection strategy with clean fallbacks
+        const nameEl = document.getElementById('new-prod-name');
+        const catEl = document.getElementById('new-prod-category');
+        const priceEl = document.getElementById('new-prod-price');
+        const unitEl = document.getElementById('new-prod-unit');
+        const stockEl = document.getElementById('new-prod-stock');
+        const imgEl = document.getElementById('new-prod-img');
+        const descEl = document.getElementById('new-prod-desc') || document.querySelector('[placeholder*="description"]');
+
+        const name = nameEl ? nameEl.value.trim() : '';
+        const category = catEl ? catEl.value : 'garlands';
+        const price = priceEl ? priceEl.value : '';
+        const unit = unitEl ? unitEl.value.trim() : '';
+        const stock = stockEl ? stockEl.value : '';
+        const img = imgEl ? imgEl.value.trim() : '';
+        const desc = descEl ? descEl.value.trim() : '';
 
         if (!name || !price || !unit || !stock) {
             alert('⚠️ Please fill out all essential fields (Name, Price, Unit, Stock) to save a product.');
@@ -397,22 +406,23 @@ function addNewProduct() {
 
         db.ref(`catalog/${uniqueId}`).set(cleanPayload)
             .then(() => {
-                alert('✨ Product successfully registered to cloud database catalog!');
-                document.getElementById('new-prod-name').value = '';
-                document.getElementById('new-prod-price').value = '';
-                document.getElementById('new-prod-unit').value = '';
-                document.getElementById('new-prod-stock').value = '';
-                if(document.getElementById('new-prod-img')) document.getElementById('new-prod-img').value = '';
-                if(document.getElementById('new-prod-desc')) document.getElementById('new-prod-desc').value = '';
+                alert('✨ Product successfully registered to live database catalog!');
+                
+                // Clear out all input fields entirely right after a successful save
+                if(nameEl) nameEl.value = '';
+                if(priceEl) priceEl.value = '';
+                if(unitEl) unitEl.value = '';
+                if(stockEl) stockEl.value = '';
+                if(imgEl) imgEl.value = '';
+                if(descEl) descEl.value = '';
             })
             .catch((error) => {
-                alert('❌ Firebase Database Error: ' + error.message);
+                alert('❌ Firebase Database Sync Error: ' + error.message);
             });
     } catch (err) {
-        alert('❌ JavaScript Error: ' + err.message);
+        alert('❌ Front-End Script Error: ' + err.message);
     }
 }
-
 
 function updateProductField(productId, field, value) {
     db.ref(`catalog/${productId}/${field}`).set(value);
@@ -420,14 +430,13 @@ function updateProductField(productId, field, value) {
 
 function deleteProduct(productId) {
     if (confirm('🗑️ Are you completely sure you want to remove this item from your store database catalog?')) {
-        db.ref(`catalog/${productId}`).remove().then(() => {
-            alert('Item removed successfully.');
-        });
+        db.ref(`catalog/${productId}`).remove();
     }
 }
 
 function renderOrderHistory(ordersData) {
     const container = document.getElementById('orders-history-container');
+    if(!container) return;
     container.innerHTML = '';
 
     if (!ordersData) {
