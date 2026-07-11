@@ -369,42 +369,50 @@ function showOwnerDashboard() {
 }
 
 function addNewProduct() {
-    const name = document.getElementById('new-prod-name').value.trim();
-    const category = document.getElementById('new-prod-category').value;
-    const price = document.getElementById('new-prod-price').value;
-    const unit = document.getElementById('new-prod-unit').value.trim();
-    const stock = document.getElementById('new-prod-stock').value;
-    const img = document.getElementById('new-prod-img').value.trim();
-    const desc = document.getElementById('new-prod-desc').value.trim();
+    try {
+        const name = document.getElementById('new-prod-name').value.trim();
+        const category = document.getElementById('new-prod-category').value;
+        const price = document.getElementById('new-prod-price').value;
+        const unit = document.getElementById('new-prod-unit').value.trim();
+        const stock = document.getElementById('new-prod-stock').value;
+        const img = document.getElementById('new-prod-img').value.trim();
+        const desc = document.getElementById('new-prod-desc') ? document.getElementById('new-prod-desc').value.trim() : '';
 
-    if (!name || !price || !unit || !stock) {
-        alert('⚠️ Please fill out all essential fields (Name, Price, Unit, Stock) to save a product.');
-        return;
+        if (!name || !price || !unit || !stock) {
+            alert('⚠️ Please fill out all essential fields (Name, Price, Unit, Stock) to save a product.');
+            return;
+        }
+
+        const uniqueId = Date.now().toString();
+        const cleanPayload = {
+            id: uniqueId,
+            name: name,
+            category: category,
+            price: Number(price),
+            unit: unit,
+            stock: Number(stock),
+            img: img || 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400',
+            desc: desc || 'Fresh daily morning arrivals.'
+        };
+
+        db.ref(`catalog/${uniqueId}`).set(cleanPayload)
+            .then(() => {
+                alert('✨ Product successfully registered to cloud database catalog!');
+                document.getElementById('new-prod-name').value = '';
+                document.getElementById('new-prod-price').value = '';
+                document.getElementById('new-prod-unit').value = '';
+                document.getElementById('new-prod-stock').value = '';
+                if(document.getElementById('new-prod-img')) document.getElementById('new-prod-img').value = '';
+                if(document.getElementById('new-prod-desc')) document.getElementById('new-prod-desc').value = '';
+            })
+            .catch((error) => {
+                alert('❌ Firebase Database Error: ' + error.message);
+            });
+    } catch (err) {
+        alert('❌ JavaScript Error: ' + err.message);
     }
-
-    const uniqueId = Date.now().toString();
-    const cleanPayload = {
-        id: uniqueId,
-        name: name,
-        category: category,
-        price: Number(price),
-        unit: unit,
-        stock: Number(stock),
-        img: img || 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400',
-        desc: desc || 'Fresh daily morning arrivals.'
-    };
-
-    db.ref(`catalog/${uniqueId}`).set(cleanPayload).then(() => {
-        alert('✨ Product successfully registered to cloud database catalog!');
-        // Reset element fields inputs
-        document.getElementById('new-prod-name').value = '';
-        document.getElementById('new-prod-price').value = '';
-        document.getElementById('new-prod-unit').value = '';
-        document.getElementById('new-prod-stock').value = '';
-        document.getElementById('new-prod-img').value = '';
-        document.getElementById('new-prod-desc').value = '';
-    });
 }
+
 
 function updateProductField(productId, field, value) {
     db.ref(`catalog/${productId}/${field}`).set(value);
