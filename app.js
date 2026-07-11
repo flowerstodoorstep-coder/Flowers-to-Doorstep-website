@@ -2,7 +2,7 @@
 const firebaseConfig = {
   apiKey: "AIzaSyCG9PiY1pdZKm0-Z9raOWQfx8k3YL50n4k",
   authDomain: "flowers-to-doorstep.firebaseapp.com",
-  databaseURL: "https://flowers-to-step-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  databaseURL: "https://flowers-to-doorstep-default-rtdb.asia-southeast1.firebasedatabase.app/",
   projectId: "flowers-to-doorstep",
   storageBucket: "flowers-to-doorstep.firebasestorage.app",
   messagingSenderId: "849984447371",
