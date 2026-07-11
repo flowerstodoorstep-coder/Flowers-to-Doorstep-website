@@ -323,8 +323,8 @@ function showOwnerDashboard() {
     });
 }
 
-// DEFENSIVE PRODUCT UPLOADER FUNCTION
-function addNewProduct() {
+// BIND GLOBAL LOGIC SAFELY INTO THE GLOBAL WINDOW FOR IMMEDIATE MOBILE ACCESS
+window.addNewProduct = function() {
     try {
         const nameEl = document.getElementById('new-prod-name');
         const catEl = document.getElementById('new-prod-category');
@@ -375,7 +375,7 @@ function addNewProduct() {
     } catch (err) {
         alert('❌ Caught JavaScript Mismatch Error: ' + err.message);
     }
-}
+};
 
 function updateProductField(productId, field, value) {
     db.ref(`catalog/${productId}/${field}`).set(value);
