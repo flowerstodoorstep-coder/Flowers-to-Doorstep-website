@@ -1,8 +1,312 @@
-// REPLACE your existing showOwnerDashboard() function with this one.
-// It adds a visible "Save" button per row (instead of silent auto-save on
-// onchange) and shows a clear success/error alert so a failed write can
-// never look identical to a successful one.
+// Live Realtime Firebase Engine Cloud Configuration Linked to Singapore Data Pod
+const firebaseConfig = {
+  apiKey: "AIzaSyCG9PiY1pdZKm0-Z9raOWQfx8k3YL50n4k",
+  authDomain: "flowers-to-doorstep.firebaseapp.com",
+  databaseURL: "https://flowers-to-step-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "flowers-to-doorstep",
+  storageBucket: "flowers-to-doorstep.firebasestorage.app",
+  messagingSenderId: "849984447371",
+  appId: "1:849984447371:web:63ea8c98abec5eb218858e",
+  measurementId: "G-Y02LJJHGHZ"
+};
 
+// Initialize Instance Runtime Safely
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.database();
+
+const FALLBACK_SEEDS = [
+    { id: "prod_1", name: 'Rose', price: 80, unit: '100 grams loose', category: 'loose flowers', stock: 15, desc: 'Fresh bright red aromatic loose roses for daily pooja arrangements.', img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400' },
+    { id: "prod_2", name: 'White Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 5, desc: 'Crisp handpicked traditional white chrysanthemums.', img: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=400' },
+    { id: "prod_3", name: 'Yellow Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 12, desc: 'Bright yellow auspicious blooms ideal for home decoration festive setups.', img: 'https://images.unsplash.com/photo-1596436889106-be35e843f974?q=80&w=400' },
+    { id: "prod_4", name: 'Small Jasmine Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 8, desc: 'Sana Jaji thin-spun tight weave fragrant garland strands.', img: 'https://images.unsplash.com/photo-1546842931-886c185b4c8c?q=80&w=400' },
+    { id: "prod_5", name: 'Shevanti Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 4, desc: 'Dense thick yellow chrysanthemums woven tightly for deity frames.', img: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?q=80&w=400' }
+];
+
+let products = [];
+let cart = {};
+let selectedCategory = null;
+let currentView = 'customer';
+let isOwnerAuthenticated = false;
+
+// Auto Setup Database Node if completely missing
+db.ref('catalog').once('value', snap => {
+    if (!snap.exists()) {
+        const seedMap = {};
+        FALLBACK_SEEDS.forEach(p => { seedMap[p.id] = p; });
+        db.ref('catalog').set(seedMap);
+    }
+});
+
+// Live Synchronized Inventory Listener with CRASH PROTECTION
+db.ref('catalog').on('value', snap => {
+    try {
+        const data = snap.val();
+        if (data) {
+            products = Object.keys(data)
+                .filter(key => data[key] !== null && data[key] !== undefined)
+                .map(key => {
+                    const item = data[key];
+                    return { id: key, ...item };
+                });
+        } else {
+            products = [];
+        }
+        renderProducts();
+        if (isOwnerAuthenticated && currentView === 'owner') showOwnerDashboard();
+    } catch (e) {
+        console.error("Data Sync Error Caught: ", e);
+    }
+});
+
+// Order Log Syncer Engine
+db.ref('orders').on('value', snap => {
+    if (isOwnerAuthenticated && currentView === 'owner') {
+        renderOrderHistory(snap.val());
+    }
+});
+
+// Load App Wallpaper
+setTimeout(() => {
+    const bg = document.getElementById('bg-image');
+    if(bg) bg.style.backgroundImage = "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200')";
+}, 500);
+
+window.selectCategory = function(category) {
+    selectedCategory = (selectedCategory === category) ? null : category;
+    const bg = document.getElementById('bg-image');
+    if (bg) {
+        bg.className = !selectedCategory 
+            ? "fixed inset-0 bg-cover bg-center transition-all duration-700 ease-in-out z-0 scale-100 opacity-100"
+            : "fixed inset-0 bg-cover bg-center transition-all duration-700 ease-in-out z-0 scale-105 opacity-20 blur-md";
+    }
+    updateNavUI();
+    renderProducts();
+};
+
+function updateNavUI() {
+    ['garlands', 'loose', 'others'].forEach(id => {
+        const btn = document.getElementById(`btn-${id}`);
+        if (!btn) return;
+        const catName = id === 'loose' ? 'loose flowers' : id;
+        btn.className = (selectedCategory === catName)
+            ? "flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 bg-amber-400 text-slate-950 shadow-lg"
+            : "flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5";
+    });
+}
+
+function renderProducts() {
+    const container = document.getElementById('products-container');
+    if(!container) return;
+    container.innerHTML = '';
+    
+    if (!selectedCategory) {
+        container.className = "block text-center py-16 bg-black/20 backdrop-blur-xs rounded-2xl border border-white/5 p-6 mb-36";
+        container.innerHTML = `<p class="text-xl font-medium text-amber-200">Welcome to Our Store</p>
+                               <p class="text-gray-400 text-sm mt-2 max-w-md mx-auto">Select a product category tab from the navigation bar above to browse our live inventory.</p>`;
+        return;
+    }
+
+    container.className = "grid grid-cols-1 sm:grid-cols-2 gap-6 mb-36";
+    const filtered = products.filter(p => p && p.category === selectedCategory);
+    
+    if(filtered.length === 0) {
+        container.innerHTML = `<p class="col-span-full text-center text-gray-500 italic text-sm py-8">No products found inside this section currently.</p>`;
+        return;
+    }
+
+    filtered.forEach(product => {
+        const cartQty = cart[product.id] || 0;
+        const card = document.createElement('div');
+        card.className = "bg-slate-900/80 border border-white/5 rounded-xl overflow-hidden flex flex-col justify-between shadow-xl relative";
+        
+        let actionButtons = Number(product.stock) <= 0 
+            ? `<span class="text-gray-500 font-medium text-xs bg-white/5 px-3 py-1.5 rounded-md">Sold Out Today</span>`
+            : `<div class="flex items-center gap-2">
+                    ${cartQty > 0 ? `<button onclick="addToCart('${product.id}', -1)" class="bg-white/10 hover:bg-white/20 w-8 h-8 rounded-lg font-bold flex items-center justify-center border border-white/20">-</button>` : ''}
+                    ${cartQty > 0 ? `<span class="font-bold text-sm px-1">${cartQty}</span>` : ''}
+                    <button onclick="addToCart('${product.id}', 1)" class="bg-amber-400 hover:bg-amber-500 text-slate-950 px-4 py-2 rounded-lg font-bold text-xs tracking-wider transition">
+                        ${cartQty > 0 ? 'Add More' : 'Add to Cart'}
+                    </button>
+               </div>`;
+
+        card.innerHTML = `
+            <div class="relative h-48 bg-slate-800">
+                <img src="${product.img || 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400'}" alt="${product.name}" class="w-full h-full object-cover">
+                ${Number(product.stock) <= 0 ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm"><span class="bg-red-600 text-white font-black px-4 py-2 rounded text-xs tracking-widest uppercase border border-red-400">OUT OF STOCK</span></div>` : ''}
+            </div>
+            <div class="p-4 flex-1 flex flex-col justify-between">
+                <div class="space-y-1">
+                    <h3 class="font-bold text-lg text-white leading-tight">${product.name}</h3>
+                    <p class="text-amber-400/90 text-xs font-semibold">${product.unit}</p>
+                    <p class="text-gray-400 text-xs font-normal line-clamp-2 pt-1 border-t border-white/5">${product.desc || 'Fresh daily morning arrivals.'}</p>
+                </div>
+                <div class="flex items-center justify-between mt-4 pt-2 border-t border-white/5">
+                    <span class="text-xl font-black text-amber-400">₹${product.price}</span>
+                    ${actionButtons}
+                </div>
+            </div>`;
+        container.appendChild(card);
+    });
+}
+
+window.addToCart = function(productId, change) {
+    const item = products.find(p => p && p.id === productId);
+    const currentQty = cart[productId] || 0;
+    const targetQty = currentQty + change;
+
+    if (targetQty > Number(item.stock)) {
+        alert(`⚠️ Cannot add more! Only ${item.stock} units remain available in stock.`);
+        return;
+    }
+
+    if (targetQty <= 0) delete cart[productId];
+    else cart[productId] = targetQty;
+
+    renderProducts();
+    updateCartDrawer();
+};
+
+function updateCartDrawer() {
+    const drawer = document.getElementById('cart-drawer');
+    const itemsContainer = document.getElementById('cart-items');
+    if(!itemsContainer || !drawer) return;
+    itemsContainer.innerHTML = '';
+
+    let subtotal = 0;
+    Object.entries(cart).forEach(([id, qty]) => {
+        const prod = products.find(p => p && p.id === id);
+        if (prod) {
+            subtotal += Number(prod.price) * qty;
+            const row = document.createElement('div');
+            row.className = "flex justify-between items-center text-sm bg-white/5 p-2.5 rounded-lg border border-white/5";
+            row.innerHTML = `<div><span class="font-semibold text-white">${prod.name}</span><span class="text-gray-400 text-xs ml-2">(${qty} x ₹${prod.price})</span></div><span class="font-bold text-amber-400">₹${prod.price * qty}</span>`;
+            itemsContainer.appendChild(row);
+        }
+    });
+
+    if (subtotal === 0) {
+        drawer.classList.add('hidden');
+        return;
+    }
+    drawer.classList.remove('hidden');
+
+    const promoBanner = document.getElementById('promo-banner');
+    if (promoBanner) {
+        if (subtotal < 200) {
+            promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-amber-500/10 border border-amber-500/30 text-amber-300";
+            promoBanner.innerHTML = `🛒 Your subtotal is ₹${subtotal}. <span class="underline font-bold text-amber-400">Add ₹${200 - subtotal} more</span> for FREE delivery!`;
+        } else {
+            promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
+            promoBanner.innerHTML = `🎉 Splendid! Your order qualifies for Free Doorstep Delivery.`;
+        }
+    }
+
+    const fee = (subtotal < 200) ? 20 : 0;
+    document.getElementById('pricing-summary').innerText = `Subtotal Items: ₹${subtotal} | Delivery Fee: ${fee > 0 ? `₹${fee}` : 'FREE'}`;
+    document.getElementById('cart-total').innerText = `₹${subtotal + fee}`;
+    validateAreaSelection();
+}
+
+window.validateAreaSelection = function() {
+    const area = document.getElementById('delivery-area').value;
+    const btn = document.getElementById('checkout-btn');
+    const addressInput = document.getElementById('delivery-address');
+
+    if (area === 'outside') {
+        btn.innerText = 'UNSERVICEABLE AREA';
+        btn.className = "w-full sm:w-auto bg-red-600 text-white px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition cursor-not-allowed";
+        addressInput.disabled = true;
+    } else {
+        btn.innerText = 'PLACE ORDER & SEND WHATSAPP';
+        btn.className = "w-full sm:w-auto bg-amber-400 hover:bg-amber-500 text-slate-950 px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg";
+        addressInput.disabled = false;
+    }
+};
+
+window.submitOrder = function() {
+    const area = document.getElementById('delivery-area').value;
+    const address = document.getElementById('delivery-address').value;
+    const name = document.getElementById('customer-name').value;
+    const phone = document.getElementById('customer-phone').value;
+
+    if (!name.trim()) return alert('⚠️ Please provide your name to route delivery.');
+    if (!phone.trim() || phone.length < 10) return alert('⚠️ A valid 10-digit WhatsApp number is needed.');
+    if (area === 'outside') return alert('❌ Sorry, delivery is bound to Gowlidoddi layouts only.');
+    if (!address.trim()) return alert('⚠️ Complete local housing street address is required.');
+
+    let subtotal = 0;
+    let whatsappOrderList = ""; 
+    const updates = {};
+    const orderItems = [];
+
+    for (const [id, qty] of Object.entries(cart)) {
+        const prod = products.find(p => p && p.id === id);
+        if (!prod) continue;
+
+        const currentStock = Number(prod.stock);
+        if (qty > currentStock) return alert(`🚨 Inventory conflict for "${prod.name}".`);
+
+        subtotal += Number(prod.price) * qty;
+        updates[`/catalog/${id}/stock`] = currentStock - qty;
+        whatsappOrderList += `- ${prod.name} (${prod.unit}) x ${qty} = ₹${Number(prod.price) * qty}\n`;
+        orderItems.push({ name: prod.name, qty: qty, price: Number(prod.price) });
+    }
+
+    const finalFee = subtotal < 200 ? 20 : 0;
+    const logOrderData = {
+        name, phone, items: orderItems, address, subtotal, deliveryFee: finalFee, total: subtotal + finalFee, timestamp: new Date().toLocaleString()
+    };
+
+    db.ref().update(updates).then(() => {
+        db.ref('orders').push(logOrderData);
+        const textPayload = `New Order - Flowers To Doorstep\n\n🌸 *CUSTOMER DETAILS*\nName: ${name}\nPhone: ${phone}\nAddress: ${address}, Gowlidoddi\n\n📦 *ITEMS ORDERED*\n${whatsappOrderList}\n💵 *BILLING SUMMARY*\nSubtotal: ₹${subtotal}\nDelivery: ${finalFee > 0 ? `₹${finalFee}` : 'FREE'}\n*Total Amount Payable: ₹${subtotal + finalFee}*`;
+        alert('🎉 Order logged on dashboard! Opening WhatsApp...');
+        cart = {};
+        document.getElementById('customer-name').value = '';
+        document.getElementById('customer-phone').value = '';
+        document.getElementById('delivery-address').value = '';
+        selectedCategory = null;
+        updateNavUI();
+        updateCartDrawer();
+        window.open(`https://api.whatsapp.com/send?phone=91XXXXXXXXXX&text=${encodeURIComponent(textPayload)}`, '_blank');
+    });
+};
+
+window.toggleView = function() {
+    const customerView = document.getElementById('customer-view');
+    const ownerView = document.getElementById('owner-view');
+    const toggleBtn = document.getElementById('view-toggle-btn');
+    if(!customerView || !ownerView || !toggleBtn) return;
+
+    if (currentView === 'customer') {
+        currentView = 'owner';
+        customerView.classList.replace('block', 'hidden');
+        ownerView.classList.replace('hidden', 'block');
+        toggleBtn.innerText = 'Go To Storefront';
+        if (isOwnerAuthenticated) showOwnerDashboard();
+    } else {
+        currentView = 'customer';
+        customerView.classList.replace('hidden', 'block');
+        ownerView.classList.replace('block', 'hidden');
+        toggleBtn.innerText = 'Switch to Owner Panel';
+    }
+};
+
+window.verifyOwnerPassword = function() {
+    const inputPass = document.getElementById('owner-password').value;
+    if (inputPass === 'admin123') { 
+        isOwnerAuthenticated = true;
+        document.getElementById('owner-auth').classList.replace('block', 'hidden');
+        showOwnerDashboard();
+        db.ref('orders').once('value', snap => renderOrderHistory(snap.val()));
+    } else {
+        alert('❌ Security Credentials Invalid!');
+    }
+};
+
+// ---- UPDATED: visible per-row Save button + error feedback ----
 function showOwnerDashboard() {
     const dashboard = document.getElementById('owner-dashboard');
     if (dashboard) dashboard.classList.remove('hidden');
@@ -34,8 +338,6 @@ function showOwnerDashboard() {
         tbody.appendChild(tr);
     });
 
-    // One delegated listener handles every row — avoids re-binding issues
-    // when the table re-renders on every Firebase update.
     tbody.onclick = function (e) {
         const btn = e.target.closest('button[data-action]');
         if (!btn) return;
@@ -72,4 +374,91 @@ function showOwnerDashboard() {
                 });
         }
     };
+}
+
+window.addNewProduct = function() {
+    try {
+        const nameEl = document.getElementById('new-prod-name');
+        const catEl = document.getElementById('new-prod-category');
+        const priceEl = document.getElementById('new-prod-price');
+        const unitEl = document.getElementById('new-prod-unit');
+        const stockEl = document.getElementById('new-prod-stock');
+        const imgEl = document.getElementById('new-prod-img');
+        const descEl = document.getElementById('new-prod-desc');
+
+        const name = nameEl ? nameEl.value.trim() : '';
+        const category = catEl ? catEl.value : 'garlands';
+        const price = priceEl ? priceEl.value : '';
+        const unit = unitEl ? unitEl.value.trim() : '';
+        const stock = stockEl ? stockEl.value : '';
+        const img = imgEl ? imgEl.value.trim() : '';
+        const desc = descEl ? descEl.value.trim() : '';
+
+        if (!name || !price || !unit || !stock) {
+            alert('⚠️ Please fill out Name, Price, Unit, and Stock values.');
+            return;
+        }
+
+        const uniqueId = "prod_" + Date.now().toString(); 
+        const cleanPayload = {
+            id: uniqueId,
+            name: name,
+            category: category,
+            price: Number(price),
+            unit: unit,
+            stock: Number(stock),
+            img: img || 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400',
+            desc: desc || 'Fresh daily morning arrivals.'
+        };
+
+        db.ref(`catalog/${uniqueId}`).set(cleanPayload)
+            .then(() => {
+                alert('✨ Product successfully registered to live database!');
+                if(nameEl) nameEl.value = '';
+                if(priceEl) priceEl.value = '';
+                if(unitEl) unitEl.value = '';
+                if(stockEl) stockEl.value = '';
+                if(imgEl) imgEl.value = '';
+                if(descEl) descEl.value = '';
+            })
+            .catch((error) => {
+                alert('❌ Firebase Sync Error: ' + error.message);
+            });
+    } catch (err) {
+        alert('❌ Caught JavaScript Mismatch Error: ' + err.message);
+    }
+};
+
+window.updateProductField = function(productId, field, value) {
+    db.ref(`catalog/${productId}/${field}`).set(value);
+};
+
+window.deleteProduct = function(productId) {
+    if (confirm('🗑️ Remove this item from database?')) {
+        db.ref(`catalog/${productId}`).remove();
+    }
+};
+
+function renderOrderHistory(ordersData) {
+    const container = document.getElementById('orders-history-container');
+    if(!container) return;
+    container.innerHTML = '';
+    if (!ordersData) {
+        container.innerHTML = `<p class="text-gray-400 text-sm italic">No entries saved yet.</p>`;
+        return;
+    }
+    Object.values(ordersData).reverse().forEach(order => {
+        const div = document.createElement('div');
+        div.className = "bg-slate-950 border border-white/10 rounded-xl p-4 space-y-2 border-l-4 border-l-emerald-500 shadow-lg";
+        let itemsList = order.items.map(i => `<li class="text-xs text-gray-300">• ${i.name} (Qty: ${i.qty}) - ₹${i.price * i.qty}</li>`).join('');
+        div.innerHTML = `
+            <div class="flex justify-between items-center text-xs text-gray-400">
+                <span>📅 ${order.timestamp}</span>
+                <span class="text-emerald-400 font-bold font-mono">Total Collected: ₹${order.total}</span>
+            </div>
+            <div class="text-sm font-bold text-white">👤 ${order.name || 'Customer'} (${order.phone || 'N/A'})</div>
+            <div class="text-xs text-emerald-400">📍 Delivery to: ${order.address}, Gowlidoddi</div>
+            <ul class="space-y-1 bg-white/5 p-2 rounded-lg mt-1">${itemsList}</ul>`;
+        container.appendChild(div);
+    });
 }
