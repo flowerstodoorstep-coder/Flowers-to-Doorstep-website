@@ -1,4 +1,4 @@
-// Live Realtime Firebase Engine Cloud Configuration Linked to Singapore Data Pod
+// Live Realtime Firebase Engine Cloud Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCG9PiY1pdZKm0-Z9raOWQfx8k3YL50n4k",
   authDomain: "flowers-to-doorstep.firebaseapp.com",
@@ -10,7 +10,10 @@ const firebaseConfig = {
   measurementId: "G-Y02LJJHGHZ"
 };
 
-// Initialize Instance Runtime Safely
+const OWNER_WHATSAPP = "919704978710";
+const OWNER_UPI_ID = "6302338300@axl";
+const OWNER_UPI_NAME = "Flowers to Doorstep";
+
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
@@ -30,7 +33,6 @@ let selectedCategory = null;
 let currentView = 'customer';
 let isOwnerAuthenticated = false;
 
-// Auto Setup Database Node if completely missing
 db.ref('catalog').once('value', snap => {
     if (!snap.exists()) {
         const seedMap = {};
@@ -39,17 +41,13 @@ db.ref('catalog').once('value', snap => {
     }
 });
 
-// Live Synchronized Inventory Listener with CRASH PROTECTION
 db.ref('catalog').on('value', snap => {
     try {
         const data = snap.val();
         if (data) {
             products = Object.keys(data)
                 .filter(key => data[key] !== null && data[key] !== undefined)
-                .map(key => {
-                    const item = data[key];
-                    return { id: key, ...item };
-                });
+                .map(key => ({ id: key, ...data[key] }));
         } else {
             products = [];
         }
@@ -60,24 +58,22 @@ db.ref('catalog').on('value', snap => {
     }
 });
 
-// Order Log Syncer Engine
 db.ref('orders').on('value', snap => {
     if (isOwnerAuthenticated && currentView === 'owner') {
         renderOrderHistory(snap.val());
     }
 });
 
-// Load App Wallpaper
 setTimeout(() => {
     const bg = document.getElementById('bg-image');
-    if(bg) bg.style.backgroundImage = "url('images/hero-background.jpg')";
+    if (bg) bg.style.backgroundImage = "url('images/hero-background.jpg')";
 }, 500);
 
 window.selectCategory = function(category) {
     selectedCategory = (selectedCategory === category) ? null : category;
     const bg = document.getElementById('bg-image');
     if (bg) {
-        bg.className = !selectedCategory 
+        bg.className = !selectedCategory
             ? "fixed inset-0 bg-cover bg-center transition-all duration-700 ease-in-out z-0 scale-100 opacity-100"
             : "fixed inset-0 bg-cover bg-center transition-all duration-700 ease-in-out z-0 scale-105 opacity-20 blur-md";
     }
@@ -98,9 +94,9 @@ function updateNavUI() {
 
 function renderProducts() {
     const container = document.getElementById('products-container');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = '';
-    
+
     if (!selectedCategory) {
         container.className = "block text-center py-16 bg-black/20 backdrop-blur-xs rounded-2xl border border-white/5 p-6 mb-36";
         container.innerHTML = `<p class="text-xl font-medium text-amber-200">Welcome to Our Store</p>
@@ -110,8 +106,8 @@ function renderProducts() {
 
     container.className = "grid grid-cols-1 sm:grid-cols-2 gap-6 mb-36";
     const filtered = products.filter(p => p && p.category === selectedCategory);
-    
-    if(filtered.length === 0) {
+
+    if (filtered.length === 0) {
         container.innerHTML = `<p class="col-span-full text-center text-gray-500 italic text-sm py-8">No products found inside this section currently.</p>`;
         return;
     }
@@ -120,8 +116,8 @@ function renderProducts() {
         const cartQty = cart[product.id] || 0;
         const card = document.createElement('div');
         card.className = "bg-slate-900/80 border border-white/5 rounded-xl overflow-hidden flex flex-col justify-between shadow-xl relative";
-        
-        let actionButtons = Number(product.stock) <= 0 
+
+        let actionButtons = Number(product.stock) <= 0
             ? `<span class="text-gray-500 font-medium text-xs bg-white/5 px-3 py-1.5 rounded-md">Sold Out Today</span>`
             : `<div class="flex items-center gap-2">
                     ${cartQty > 0 ? `<button onclick="addToCart('${product.id}', -1)" class="bg-white/10 hover:bg-white/20 w-8 h-8 rounded-lg font-bold flex items-center justify-center border border-white/20">-</button>` : ''}
@@ -133,7 +129,7 @@ function renderProducts() {
 
         card.innerHTML = `
             <div class="relative h-48 bg-slate-800">
-                <img src="${product.img || 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400'}" alt="${product.name}" class="w-full h-full object-cover">
+                <img src="${product.img || 'images/placeholder.jpg'}" alt="${product.name}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
                 ${Number(product.stock) <= 0 ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm"><span class="bg-red-600 text-white font-black px-4 py-2 rounded text-xs tracking-widest uppercase border border-red-400">OUT OF STOCK</span></div>` : ''}
             </div>
             <div class="p-4 flex-1 flex flex-col justify-between">
@@ -165,48 +161,100 @@ window.addToCart = function(productId, change) {
     else cart[productId] = targetQty;
 
     renderProducts();
-    updateCartDrawer();
+    updateBasketFab();
 };
 
-function updateCartDrawer() {
-    const drawer = document.getElementById('cart-drawer');
+function cartEntries() {
+    return Object.entries(cart)
+        .map(([id, qty]) => ({ product: products.find(p => p && p.id === id), qty }))
+        .filter(e => e.product);
+}
+
+function cartSubtotal() {
+    return cartEntries().reduce((s, e) => s + Number(e.product.price) * e.qty, 0);
+}
+
+function updateBasketFab() {
+    const fab = document.getElementById('basket-fab');
+    const entries = cartEntries();
+    const count = entries.reduce((s, e) => s + e.qty, 0);
+    const subtotal = cartSubtotal();
+
+    if (count === 0) {
+        fab.classList.add('hidden');
+        fab.classList.remove('flex');
+        return;
+    }
+    fab.classList.remove('hidden');
+    fab.classList.add('flex');
+    document.getElementById('basket-count').textContent = count;
+    document.getElementById('basket-total').textContent = subtotal;
+}
+
+window.openBasket = function() {
+    renderBasketScreen();
+    document.getElementById('cart-overlay').classList.remove('hidden');
+    document.getElementById('cart-overlay').classList.add('flex');
+    document.getElementById('basket-screen').classList.remove('hidden');
+    document.getElementById('checkout-screen').classList.add('hidden');
+};
+
+window.closeCartOverlay = function() {
+    document.getElementById('cart-overlay').classList.add('hidden');
+    document.getElementById('cart-overlay').classList.remove('flex');
+};
+
+window.goToCheckout = function() {
+    document.getElementById('basket-screen').classList.add('hidden');
+    document.getElementById('checkout-screen').classList.remove('hidden');
+    validateAreaSelection();
+};
+
+window.backToBasket = function() {
+    document.getElementById('checkout-screen').classList.add('hidden');
+    document.getElementById('basket-screen').classList.remove('hidden');
+    renderBasketScreen();
+};
+
+function renderBasketScreen() {
+    const entries = cartEntries();
     const itemsContainer = document.getElementById('cart-items');
-    if(!itemsContainer || !drawer) return;
     itemsContainer.innerHTML = '';
 
     let subtotal = 0;
-    Object.entries(cart).forEach(([id, qty]) => {
-        const prod = products.find(p => p && p.id === id);
-        if (prod) {
-            subtotal += Number(prod.price) * qty;
-            const row = document.createElement('div');
-            row.className = "flex justify-between items-center text-sm bg-white/5 p-2.5 rounded-lg border border-white/5";
-            row.innerHTML = `<div><span class="font-semibold text-white">${prod.name}</span><span class="text-gray-400 text-xs ml-2">(${qty} x ₹${prod.price})</span></div><span class="font-bold text-amber-400">₹${prod.price * qty}</span>`;
-            itemsContainer.appendChild(row);
-        }
+    entries.forEach(e => {
+        subtotal += Number(e.product.price) * e.qty;
+        const row = document.createElement('div');
+        row.className = "flex justify-between items-center text-sm bg-white/5 p-2.5 rounded-lg border border-white/5";
+        row.innerHTML = `
+            <div class="flex items-center gap-2">
+                <button onclick="addToCart('${e.product.id}', -1)" class="bg-white/10 hover:bg-white/20 w-7 h-7 rounded-lg font-bold flex items-center justify-center border border-white/20 text-xs">-</button>
+                <span class="font-bold text-white">${e.qty}</span>
+                <button onclick="addToCart('${e.product.id}', 1)" class="bg-white/10 hover:bg-white/20 w-7 h-7 rounded-lg font-bold flex items-center justify-center border border-white/20 text-xs">+</button>
+                <div class="ml-2">
+                    <div class="font-semibold text-white">${e.product.name}</div>
+                    <div class="text-gray-400 text-xs">₹${e.product.price} each</div>
+                </div>
+            </div>
+            <span class="font-bold text-amber-400">₹${e.product.price * e.qty}</span>`;
+        itemsContainer.appendChild(row);
+        row.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => renderBasketScreen()));
     });
 
-    if (subtotal === 0) {
-        drawer.classList.add('hidden');
-        return;
-    }
-    drawer.classList.remove('hidden');
-
     const promoBanner = document.getElementById('promo-banner');
-    if (promoBanner) {
-        if (subtotal < 200) {
-            promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-amber-500/10 border border-amber-500/30 text-amber-300";
-            promoBanner.innerHTML = `🛒 Your subtotal is ₹${subtotal}. <span class="underline font-bold text-amber-400">Add ₹${200 - subtotal} more</span> for FREE delivery!`;
-        } else {
-            promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
-            promoBanner.innerHTML = `🎉 Splendid! Your order qualifies for Free Doorstep Delivery.`;
-        }
+    if (subtotal < 200) {
+        promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-amber-500/10 border border-amber-500/30 text-amber-300";
+        promoBanner.innerHTML = `🛒 Your subtotal is ₹${subtotal}. <span class="underline font-bold text-amber-400">Add ₹${200 - subtotal} more</span> for FREE delivery!`;
+    } else {
+        promoBanner.className = "mb-4 text-center text-xs font-semibold p-3 rounded-xl tracking-wide bg-emerald-500/10 border border-emerald-500/30 text-emerald-400";
+        promoBanner.innerHTML = `🎉 Splendid! Your order qualifies for Free Doorstep Delivery.`;
     }
 
-    const fee = (subtotal < 200) ? 20 : 0;
-    document.getElementById('pricing-summary').innerText = `Subtotal Items: ₹${subtotal} | Delivery Fee: ${fee > 0 ? `₹${fee}` : 'FREE'}`;
+    const fee = subtotal < 200 ? 20 : 0;
+    document.getElementById('pricing-summary').innerText = `Subtotal: ₹${subtotal} | Delivery: ${fee > 0 ? `₹${fee}` : 'FREE'}`;
     document.getElementById('cart-total').innerText = `₹${subtotal + fee}`;
-    validateAreaSelection();
+
+    updateBasketFab();
 }
 
 window.validateAreaSelection = function() {
@@ -216,61 +264,90 @@ window.validateAreaSelection = function() {
 
     if (area === 'outside') {
         btn.innerText = 'UNSERVICEABLE AREA';
-        btn.className = "w-full sm:w-auto bg-red-600 text-white px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition cursor-not-allowed";
+        btn.disabled = true;
+        btn.className = "w-full bg-red-600 text-white py-4 rounded-xl font-black tracking-widest uppercase text-sm cursor-not-allowed mt-2";
         addressInput.disabled = true;
     } else {
-        btn.innerText = 'PLACE ORDER & SEND WHATSAPP';
-        btn.className = "w-full sm:w-auto bg-amber-400 hover:bg-amber-500 text-slate-950 px-8 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg";
+        btn.innerText = 'CONFIRM ORDER';
+        btn.disabled = false;
+        btn.className = "w-full bg-amber-400 hover:bg-amber-500 text-slate-950 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg mt-2";
         addressInput.disabled = false;
     }
 };
 
-window.submitOrder = function() {
-    const area = document.getElementById('delivery-area').value;
-    const address = document.getElementById('delivery-address').value;
-    const name = document.getElementById('customer-name').value;
-    const phone = document.getElementById('customer-phone').value;
+window.revealUpiId = function() {
+    const el = document.getElementById('upi-id-display');
+    el.textContent = OWNER_UPI_ID;
+    el.classList.remove('hidden');
+};
 
-    if (!name.trim()) return alert('⚠️ Please provide your name to route delivery.');
-    if (!phone.trim() || phone.length < 10) return alert('⚠️ A valid 10-digit WhatsApp number is needed.');
+window.confirmOrder = function() {
+    const area = document.getElementById('delivery-area').value;
+    const address = document.getElementById('delivery-address').value.trim();
+    const name = document.getElementById('customer-name').value.trim();
+    const phone = document.getElementById('customer-phone').value.trim();
+    const paymentMethod = document.querySelector('input[name="payment-method"]:checked').value;
+
+    if (!name) return alert('⚠️ Please provide your name.');
+    if (!phone || phone.length < 10) return alert('⚠️ A valid 10-digit WhatsApp number is needed.');
     if (area === 'outside') return alert('❌ Sorry, delivery is bound to Gowlidoddi layouts only.');
-    if (!address.trim()) return alert('⚠️ Complete local housing street address is required.');
+    if (!address) return alert('⚠️ Complete local housing street address is required.');
+
+    const entries = cartEntries();
+    if (entries.length === 0) return alert('⚠️ Your basket is empty.');
 
     let subtotal = 0;
-    let whatsappOrderList = ""; 
+    let whatsappOrderList = "";
     const updates = {};
     const orderItems = [];
 
-    for (const [id, qty] of Object.entries(cart)) {
-        const prod = products.find(p => p && p.id === id);
-        if (!prod) continue;
-
+    for (const e of entries) {
+        const prod = e.product;
+        const qty = e.qty;
         const currentStock = Number(prod.stock);
-        if (qty > currentStock) return alert(`🚨 Inventory conflict for "${prod.name}".`);
+        if (qty > currentStock) return alert(`🚨 Inventory conflict for "${prod.name}". Only ${currentStock} left.`);
 
         subtotal += Number(prod.price) * qty;
-        updates[`/catalog/${id}/stock`] = currentStock - qty;
+        updates[`/catalog/${prod.id}/stock`] = currentStock - qty;
         whatsappOrderList += `- ${prod.name} (${prod.unit}) x ${qty} = ₹${Number(prod.price) * qty}\n`;
-        orderItems.push({ name: prod.name, qty: qty, price: Number(prod.price) });
+        orderItems.push({ name: prod.name, qty, price: Number(prod.price) });
     }
 
-    const finalFee = subtotal < 200 ? 20 : 0;
+    const deliveryFee = subtotal < 200 ? 20 : 0;
+    const total = subtotal + deliveryFee;
+
     const logOrderData = {
-        name, phone, items: orderItems, address, subtotal, deliveryFee: finalFee, total: subtotal + finalFee, timestamp: new Date().toLocaleString()
+        name, phone, items: orderItems, address,
+        subtotal, deliveryFee, total,
+        paymentMethod,
+        status: paymentMethod === 'UPI' ? 'UPI Payment Initiated - Confirm receipt' : 'Confirmed - Cash on Delivery',
+        timestamp: new Date().toLocaleString()
     };
+
+    if (paymentMethod === 'UPI') {
+        const upiLink = `upi://pay?pa=${encodeURIComponent(OWNER_UPI_ID)}&pn=${encodeURIComponent(OWNER_UPI_NAME)}&am=${total}&cu=INR&tn=${encodeURIComponent('Order - ' + name)}`;
+        document.getElementById('upi-fallback').classList.remove('hidden');
+        window.location.href = upiLink;
+    }
 
     db.ref().update(updates).then(() => {
         db.ref('orders').push(logOrderData);
-        const textPayload = `New Order - Flowers To Doorstep\n\n🌸 *CUSTOMER DETAILS*\nName: ${name}\nPhone: ${phone}\nAddress: ${address}, Gowlidoddi\n\n📦 *ITEMS ORDERED*\n${whatsappOrderList}\n💵 *BILLING SUMMARY*\nSubtotal: ₹${subtotal}\nDelivery: ${finalFee > 0 ? `₹${finalFee}` : 'FREE'}\n*Total Amount Payable: ₹${subtotal + finalFee}*`;
-        alert('🎉 Order logged on dashboard! Opening WhatsApp...');
+
+        const textPayload = `New Order - Flowers To Doorstep\n\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n\nOrder:\n${whatsappOrderList}\nSubtotal: ₹${subtotal}\nDelivery: ${deliveryFee > 0 ? `₹${deliveryFee}` : 'FREE'}\nTotal: ₹${total}\nPayment: ${paymentMethod}${paymentMethod === 'UPI' ? ' (please confirm receipt before dispatch)' : ''}`;
+
         cart = {};
         document.getElementById('customer-name').value = '';
         document.getElementById('customer-phone').value = '';
         document.getElementById('delivery-address').value = '';
         selectedCategory = null;
         updateNavUI();
-        updateCartDrawer();
-        window.open(`https://api.whatsapp.com/send?phone=91XXXXXXXXXX&text=${encodeURIComponent(textPayload)}`, '_blank');
+        renderProducts();
+        updateBasketFab();
+        closeCartOverlay();
+
+        setTimeout(() => {
+            window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(textPayload)}`, '_blank');
+        }, paymentMethod === 'UPI' ? 1200 : 0);
     });
 };
 
@@ -278,7 +355,7 @@ window.toggleView = function() {
     const customerView = document.getElementById('customer-view');
     const ownerView = document.getElementById('owner-view');
     const toggleBtn = document.getElementById('view-toggle-btn');
-    if(!customerView || !ownerView || !toggleBtn) return;
+    if (!customerView || !ownerView || !toggleBtn) return;
 
     if (currentView === 'customer') {
         currentView = 'owner';
@@ -296,7 +373,7 @@ window.toggleView = function() {
 
 window.verifyOwnerPassword = function() {
     const inputPass = document.getElementById('owner-password').value;
-    if (inputPass === 'admin123') { 
+    if (inputPass === 'admin123') {
         isOwnerAuthenticated = true;
         document.getElementById('owner-auth').classList.replace('block', 'hidden');
         showOwnerDashboard();
@@ -306,7 +383,6 @@ window.verifyOwnerPassword = function() {
     }
 };
 
-// ---- UPDATED: visible per-row Save button + error feedback ----
 function showOwnerDashboard() {
     const dashboard = document.getElementById('owner-dashboard');
     if (dashboard) dashboard.classList.remove('hidden');
@@ -324,6 +400,7 @@ function showOwnerDashboard() {
                 <div class="font-bold text-white">${p.name}</div>
                 <div class="text-xs text-amber-400 font-semibold mb-1">${p.unit}</div>
                 <input type="text" value="${p.desc || ''}" data-field="desc" placeholder="Add description..." class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:border-amber-400 focus:outline-none">
+                <input type="text" value="${p.img || ''}" data-field="img" placeholder="Image path e.g. images/rose.jpg" class="w-full mt-1 bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:border-amber-400 focus:outline-none">
             </td>
             <td class="p-3">
                 <input type="number" value="${p.price}" data-field="price" class="w-20 bg-slate-950 border border-white/10 rounded p-1.5 font-bold text-center text-emerald-400 focus:border-amber-400 focus:outline-none">
@@ -338,7 +415,7 @@ function showOwnerDashboard() {
         tbody.appendChild(tr);
     });
 
-    tbody.onclick = function (e) {
+    tbody.onclick = function(e) {
         const btn = e.target.closest('button[data-action]');
         if (!btn) return;
         const row = btn.closest('tr');
@@ -351,6 +428,7 @@ function showOwnerDashboard() {
 
         if (btn.dataset.action === 'save') {
             const desc = row.querySelector('[data-field="desc"]').value.trim();
+            const img = row.querySelector('[data-field="img"]').value.trim();
             const price = Number(row.querySelector('[data-field="price"]').value);
             const stock = Number(row.querySelector('[data-field="stock"]').value);
 
@@ -362,7 +440,7 @@ function showOwnerDashboard() {
             btn.disabled = true;
             btn.textContent = 'Saving…';
 
-            db.ref(`catalog/${id}`).update({ desc, price, stock })
+            db.ref(`catalog/${id}`).update({ desc, img, price, stock })
                 .then(() => {
                     btn.textContent = 'Saved ✓';
                     setTimeout(() => { btn.textContent = 'Save'; btn.disabled = false; }, 1200);
@@ -399,14 +477,9 @@ window.addNewProduct = function() {
             return;
         }
 
-        const uniqueId = "prod_" + Date.now().toString(); 
+        const uniqueId = "prod_" + Date.now().toString();
         const cleanPayload = {
-            id: uniqueId,
-            name: name,
-            category: category,
-            price: Number(price),
-            unit: unit,
-            stock: Number(stock),
+            id: uniqueId, name, category, price: Number(price), unit, stock: Number(stock),
             img: img || 'https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400',
             desc: desc || 'Fresh daily morning arrivals.'
         };
@@ -414,12 +487,7 @@ window.addNewProduct = function() {
         db.ref(`catalog/${uniqueId}`).set(cleanPayload)
             .then(() => {
                 alert('✨ Product successfully registered to live database!');
-                if(nameEl) nameEl.value = '';
-                if(priceEl) priceEl.value = '';
-                if(unitEl) unitEl.value = '';
-                if(stockEl) stockEl.value = '';
-                if(imgEl) imgEl.value = '';
-                if(descEl) descEl.value = '';
+                [nameEl, priceEl, unitEl, stockEl, imgEl, descEl].forEach(el => { if (el) el.value = ''; });
             })
             .catch((error) => {
                 alert('❌ Firebase Sync Error: ' + error.message);
@@ -427,10 +495,6 @@ window.addNewProduct = function() {
     } catch (err) {
         alert('❌ Caught JavaScript Mismatch Error: ' + err.message);
     }
-};
-
-window.updateProductField = function(productId, field, value) {
-    db.ref(`catalog/${productId}/${field}`).set(value);
 };
 
 window.deleteProduct = function(productId) {
@@ -441,7 +505,7 @@ window.deleteProduct = function(productId) {
 
 function renderOrderHistory(ordersData) {
     const container = document.getElementById('orders-history-container');
-    if(!container) return;
+    if (!container) return;
     container.innerHTML = '';
     if (!ordersData) {
         container.innerHTML = `<p class="text-gray-400 text-sm italic">No entries saved yet.</p>`;
@@ -454,10 +518,11 @@ function renderOrderHistory(ordersData) {
         div.innerHTML = `
             <div class="flex justify-between items-center text-xs text-gray-400">
                 <span>📅 ${order.timestamp}</span>
-                <span class="text-emerald-400 font-bold font-mono">Total Collected: ₹${order.total}</span>
+                <span class="text-emerald-400 font-bold font-mono">Total: ₹${order.total}</span>
             </div>
             <div class="text-sm font-bold text-white">👤 ${order.name || 'Customer'} (${order.phone || 'N/A'})</div>
-            <div class="text-xs text-emerald-400">📍 Delivery to: ${order.address}, Gowlidoddi</div>
+            <div class="text-xs text-amber-400">${order.paymentMethod || ''} — ${order.status || ''}</div>
+            <div class="text-xs text-emerald-400">📍 ${order.address}</div>
             <ul class="space-y-1 bg-white/5 p-2 rounded-lg mt-1">${itemsList}</ul>`;
         container.appendChild(div);
     });
