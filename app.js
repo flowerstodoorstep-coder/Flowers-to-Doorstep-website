@@ -70,7 +70,7 @@ db.ref('orders').on('value', snap => {
 // Load App Wallpaper
 setTimeout(() => {
     const bg = document.getElementById('bg-image');
-    if(bg) bg.style.backgroundImage = "url('https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1200')";
+    if(bg) bg.style.backgroundImage = "url('images/hero-background.jpg')";
 }, 500);
 
 window.selectCategory = function(category) {
