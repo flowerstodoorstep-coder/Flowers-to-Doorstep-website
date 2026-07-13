@@ -6,6 +6,7 @@
     <title>Flowers to Doorstep | Gowlidoddi</title>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -16,97 +17,41 @@
 
     <div class="relative z-10 max-w-4xl mx-auto px-4 py-6">
 
-        <header class="text-center my-12" id="main-header">
+        <header class="text-center my-12">
             <h1 class="text-4xl md:text-6xl font-black tracking-wide text-amber-400 drop-shadow-lg">FLOWERS TO DOORSTEP</h1>
             <p class="text-gray-300 mt-2 text-sm md:text-base tracking-wider font-light">Fresh Divine Blooms • Exclusively Serving Gowlidoddi</p>
+            <p class="text-amber-300/80 text-xs mt-2 tracking-wide">🕙 Order before 10 PM for delivery tomorrow</p>
 
             <div class="flex flex-wrap justify-center gap-3 mt-5">
-                <a href="tel:+919704978710" class="bg-white/10 hover:bg-white/20 text-xs px-4 py-2 rounded-full border border-white/20 transition tracking-widest uppercase font-bold flex items-center gap-2">
-                    📞 Call 97049 78710
-                </a>
-                <a href="https://wa.me/919704978710" target="_blank" class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs px-4 py-2 rounded-full border border-emerald-500/40 transition tracking-widest uppercase font-bold flex items-center gap-2">
-                    💬 WhatsApp Us
-                </a>
+                <a href="tel:+919704978710" class="bg-white/10 hover:bg-white/20 text-xs px-4 py-2 rounded-full border border-white/20 transition tracking-widest uppercase font-bold">📞 Call 97049 78710</a>
+                <a href="https://wa.me/919704978710" target="_blank" class="bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs px-4 py-2 rounded-full border border-emerald-500/40 transition tracking-widest uppercase font-bold">💬 WhatsApp Us</a>
+                <button onclick="openMyOrders()" class="bg-white/10 hover:bg-white/20 text-xs px-4 py-2 rounded-full border border-white/20 transition tracking-widest uppercase font-bold">📦 My Orders</button>
             </div>
-
-            <button onclick="toggleView()" id="view-toggle-btn" class="mt-4 bg-white/10 hover:bg-white/20 text-xs px-4 py-2 rounded-full border border-white/20 transition tracking-widest uppercase font-bold">Switch to Owner Panel</button>
         </header>
 
-        <div id="customer-view" class="block">
-            <nav class="sticky top-4 bg-white/10 backdrop-blur-md rounded-full p-1.5 flex justify-between border border-white/20 shadow-2xl mb-8 z-40">
-                <button onclick="selectCategory('garlands')" id="btn-garlands" class="flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5">Garlands</button>
-                <button onclick="selectCategory('loose flowers')" id="btn-loose" class="flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5">Loose Flowers</button>
-                <button onclick="selectCategory('others')" id="btn-others" class="flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5">Others</button>
-            </nav>
-            <main id="products-container" class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-36"></main>
-        </div>
+        <nav class="sticky top-4 bg-white/10 backdrop-blur-md rounded-full p-1.5 flex justify-between border border-white/20 shadow-2xl mb-8 z-40 overflow-x-auto">
+            <button onclick="selectCategory('all')" data-cat="all" class="cat-tab flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 bg-amber-400 text-slate-950 shadow-lg">All Products</button>
+            <button onclick="selectCategory('garlands')" data-cat="garlands" class="cat-tab flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5">Garlands</button>
+            <button onclick="selectCategory('loose flowers')" data-cat="loose flowers" class="cat-tab flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5">Loose Flowers</button>
+            <button onclick="selectCategory('others')" data-cat="others" class="cat-tab flex-1 py-3 text-center rounded-full font-bold text-xs md:text-sm tracking-widest uppercase transition-all duration-300 text-white hover:bg-white/5">Others</button>
+        </nav>
 
-        <div id="owner-view" class="hidden bg-slate-900/95 backdrop-blur-md border border-white/10 p-6 rounded-2xl shadow-2xl mb-12">
-            <div id="owner-auth" class="block max-w-sm mx-auto text-center py-8 space-y-4">
-                <h2 class="text-2xl font-black text-amber-400 tracking-wide">OWNER ACCESS VERIFICATION</h2>
-                <input type="password" id="owner-password" placeholder="Enter Security Passkey" class="w-full bg-slate-950 border border-white/20 rounded-xl p-3 text-center font-mono tracking-widest text-sm text-amber-400 focus:outline-none focus:border-amber-400">
-                <button onclick="verifyOwnerPassword()" class="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition">Verify Password</button>
-            </div>
+        <main id="products-container" class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-36"></main>
 
-            <div id="owner-dashboard" class="hidden space-y-8">
-                <div class="bg-slate-950/60 p-4 rounded-xl border border-white/10">
-                    <h2 class="text-lg font-black text-amber-400 mb-4 tracking-wider uppercase">➕ Add New Product to Catalog</h2>
-                    <form id="new-product-form" onsubmit="event.preventDefault(); window.addNewProduct(); return false;" class="space-y-3">
-                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                            <input type="text" id="new-prod-name" placeholder="Product Name (e.g., Red Lotus)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
-                            <select id="new-prod-category" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-gray-300">
-                                <option value="garlands">Garlands</option>
-                                <option value="loose flowers">Loose Flowers</option>
-                                <option value="others">Others</option>
-                            </select>
-                            <input type="number" id="new-prod-price" placeholder="Price (₹)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
-                            <input type="text" id="new-prod-unit" placeholder="Unit (e.g., 1 mura / 100g)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
-                            <input type="number" id="new-prod-stock" placeholder="Initial Stock Qty" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
-                            <input type="text" id="new-prod-img" placeholder="Image path e.g. images/rose.jpg" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
-                            <input type="text" id="new-prod-desc" placeholder="Short description..." class="sm:col-span-3 bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
-                        </div>
-                        <button type="submit" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition shadow-lg block cursor-pointer active:scale-95">
-                            Save Product to Live Database
-                        </button>
-                    </form>
-                </div>
-
-                <div>
-                    <h2 class="text-xl font-black text-amber-400 mb-4 pb-2 border-b border-white/10 uppercase tracking-wider">📋 Modify Existing Catalog & Stock</h2>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse min-w-[600px]">
-                            <thead>
-                                <tr class="bg-white/5 border-b border-white/10 text-xs font-bold text-amber-400 uppercase tracking-wider">
-                                    <th class="p-3">Product Details</th>
-                                    <th class="p-3 w-24">Price (₹)</th>
-                                    <th class="p-3 w-24">Stock Units</th>
-                                    <th class="p-3 text-center w-24">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-table-body" class="divide-y divide-white/5 text-sm"></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div>
-                    <h2 class="text-xl font-black text-emerald-400 mb-4 pb-2 border-b border-white/10 uppercase tracking-wider">🛒 Live Order Dashboard History</h2>
-                    <div id="orders-history-container" class="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        <p class="text-gray-400 text-sm italic">No entries saved yet.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Floating basket button (Flipkart-style) -->
         <button id="basket-fab" onclick="openBasket()" class="hidden fixed bottom-5 right-5 z-40 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-full shadow-2xl px-5 py-4 font-black text-sm items-center gap-2 tracking-wide">
             🧺 <span id="basket-count">0</span> item(s) · ₹<span id="basket-total">0</span>
         </button>
 
-        <!-- Basket / Checkout overlay -->
-        <div id="cart-overlay" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center">
+        <div id="product-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm items-end sm:items-center justify-center">
+            <div class="bg-slate-950 border border-white/10 w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-2xl p-6 relative">
+                <button onclick="closeProductModal()" class="absolute top-4 right-4 text-gray-400 text-xl leading-none z-10">✕</button>
+                <div id="product-modal-body"></div>
+            </div>
+        </div>
+
+        <div id="cart-overlay" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm items-end sm:items-center justify-center">
             <div class="bg-slate-950 border border-white/10 w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
 
-                <!-- Screen 1: Basket -->
                 <div id="basket-screen" class="p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-amber-400 font-black text-sm uppercase tracking-widest">Your Basket</h3>
@@ -121,7 +66,6 @@
                     </div>
                 </div>
 
-                <!-- Screen 2: Checkout -->
                 <div id="checkout-screen" class="p-6 hidden">
                     <div class="flex justify-between items-center mb-4">
                         <button onclick="backToBasket()" class="text-gray-400 text-sm">← Back</button>
@@ -149,6 +93,10 @@
                             <label class="block text-xs uppercase tracking-widest text-gray-400 mb-1 font-bold">Where in Gowlidoddi? (House/Flat No/Street) *</label>
                             <input type="text" id="delivery-address" placeholder="Specify home block details" class="w-full bg-slate-900 border border-white/20 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400 text-white">
                         </div>
+                        <div>
+                            <label class="block text-xs uppercase tracking-widest text-gray-400 mb-1 font-bold">Delivery Notes / Customization (optional)</label>
+                            <textarea id="order-notes" rows="2" placeholder="E.g. ring the bell twice, or customize garland length..." class="w-full bg-slate-900 border border-white/20 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400 text-white"></textarea>
+                        </div>
 
                         <div>
                             <label class="block text-xs uppercase tracking-widest text-gray-400 mb-2 font-bold">Payment Method *</label>
@@ -174,10 +122,34 @@
                         <button onclick="confirmOrder()" id="checkout-btn" class="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 py-4 rounded-xl font-black tracking-widest uppercase text-sm transition shadow-lg mt-2">Confirm Order</button>
                     </div>
                 </div>
-
             </div>
         </div>
+
+        <div id="order-confirmed-modal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm items-center justify-center px-6">
+            <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl">
+                <div class="text-5xl mb-3">🎉</div>
+                <h2 class="text-xl font-black text-emerald-400 mb-2">Order Confirmed!</h2>
+                <p class="text-gray-300 text-sm">Your fresh flowers will be delivered by <span class="text-amber-400 font-bold" id="confirmation-delivery-date"></span>. We'll reach out on WhatsApp to confirm.</p>
+                <button onclick="closeConfirmedModal()" class="mt-6 w-full bg-amber-400 hover:bg-amber-500 text-slate-950 py-3 rounded-xl font-black tracking-widest uppercase text-sm">Done</button>
+            </div>
+        </div>
+
+        <div id="my-orders-modal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm items-end sm:items-center justify-center">
+            <div class="bg-slate-950 border border-white/10 w-full sm:max-w-md sm:rounded-2xl rounded-t-3xl max-h-[85vh] overflow-y-auto shadow-2xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-amber-400 font-black text-sm uppercase tracking-widest">My Orders</h3>
+                    <button onclick="closeMyOrders()" class="text-gray-400 text-xl leading-none">✕</button>
+                </div>
+                <div class="flex gap-2 mb-4">
+                    <input type="tel" id="my-orders-phone" placeholder="Enter your phone number" class="flex-1 bg-slate-900 border border-white/20 rounded-xl p-3 text-sm focus:outline-none focus:border-amber-400 text-white">
+                    <button onclick="searchMyOrders()" class="bg-amber-400 hover:bg-amber-500 text-slate-950 px-4 rounded-xl font-bold text-sm">Search</button>
+                </div>
+                <div id="my-orders-results"></div>
+            </div>
+        </div>
+
     </div>
-    <script src="app.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="customer.js"></script>
 </body>
 </html>
