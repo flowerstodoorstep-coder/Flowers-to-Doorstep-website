@@ -1,3 +1,8 @@
+// ── PASTE YOUR CLOUDINARY VALUES HERE ──────────────────────────
+const CLOUDINARY_CLOUD_NAME = "a7zxefeq";
+const CLOUDINARY_UPLOAD_PRESET = "apvbadec";
+// ────────────────────────────────────────────────────────────
+
 let products = [];
 let isOwnerAuthenticated = false;
 
@@ -24,13 +29,37 @@ window.verifyOwnerPassword = function() {
     }
 };
 
-/* ---------------- Image upload to Firebase Storage ---------------- */
+/* ---------------- Image upload to Cloudinary (free, no card needed) ---------------- */
 function uploadImageFile(file, onComplete) {
     if (!file) { onComplete(null); return; }
-    const path = `products/${Date.now()}-${file.name}`;
-    const ref = storage.ref(path);
-    ref.put(file).then(snap => snap.ref.getDownloadURL()).then(url => onComplete(url))
-        .catch(err => { alert('❌ Image upload failed: ' + err.message); onComplete(null); });
+
+    if (CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME") {
+        alert('⚠️ Cloudinary isn\'t set up yet — open owner.js and paste your Cloud name + upload preset at the top.');
+        onComplete(null);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+    fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, {
+        method: 'POST',
+        body: formData
+    })
+        .then(res => res.json())
+        .then(data => {
+            if (data.secure_url) {
+                onComplete(data.secure_url);
+            } else {
+                alert('❌ Image upload failed: ' + (data.error?.message || 'Unknown error'));
+                onComplete(null);
+            }
+        })
+        .catch(err => {
+            alert('❌ Image upload failed: ' + err.message);
+            onComplete(null);
+        });
 }
 
 /* ---------------- Product table ---------------- */
@@ -89,7 +118,7 @@ function showOwnerDashboard() {
             }
 
             btn.disabled = true;
-            btn.textContent = 'Saving…';
+            btn.textContent = file ? 'Uploading…' : 'Saving…';
 
             uploadImageFile(file, (uploadedUrl) => {
                 const updateData = { desc, price, stock };
@@ -134,7 +163,7 @@ window.addNewProduct = function() {
 
     const submitBtn = document.getElementById('add-prod-btn');
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving…';
+    submitBtn.textContent = file ? 'Uploading photo…' : 'Saving…';
 
     uploadImageFile(file, (uploadedUrl) => {
         const uniqueId = "prod_" + Date.now().toString();
@@ -188,7 +217,20 @@ function renderOrderHistory(ordersData) {
 
     container.querySelectorAll('[data-action="mark-delivered"]').forEach(btn => {
         btn.addEventListener('click', () => {
-            db.ref(`orders/${btn.dataset.orderId}`).update({ status: 'Delivered' });
+            const orderId = btn.dataset.orderId;
+            db.ref(`orders/${orderId}`).update({ status: 'Delivered' }).then(() => {
+                db.ref(`orders/${orderId}`).once('value', snap => {
+                    const order = snap.val();
+                    if (!order) return;
+                    const customerPhone = (order.phone || '').replace(/\D/g, '').slice(-10);
+                    if (customerPhone.length !== 10) {
+                        alert('⚠️ Marked as delivered, but the saved phone number looks invalid — couldn\'t open WhatsApp automatically.');
+                        return;
+                    }
+                    const msg = `Hi ${order.name || 'there'}! 🌸 Your order from Flowers to Doorstep has been delivered. Thank you for shopping with us — hope you love your flowers!`;
+                    window.open(`https://wa.me/91${customerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+                });
+            });
         });
     });
 }
