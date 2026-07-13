@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Owner Dashboard — Flowers to Doorstep</title>
+    <meta name="robots" content="noindex, nofollow">
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-950 text-white font-sans min-h-screen relative overflow-x-hidden">
+
+    <div class="relative z-10 max-w-4xl mx-auto px-4 py-6">
+        <header class="text-center my-8">
+            <h1 class="text-3xl md:text-4xl font-black tracking-wide text-amber-400">OWNER DASHBOARD</h1>
+            <p class="text-gray-400 text-sm mt-1">Flowers to Doorstep — private management panel</p>
+        </header>
+
+        <div id="owner-auth" class="block max-w-sm mx-auto text-center py-8 space-y-4 bg-slate-900/95 border border-white/10 p-6 rounded-2xl">
+            <h2 class="text-xl font-black text-amber-400 tracking-wide">ACCESS VERIFICATION</h2>
+            <input type="password" id="owner-password" placeholder="Enter Security Passkey" class="w-full bg-slate-950 border border-white/20 rounded-xl p-3 text-center font-mono tracking-widest text-sm text-amber-400 focus:outline-none focus:border-amber-400">
+            <button onclick="verifyOwnerPassword()" class="w-full bg-amber-400 hover:bg-amber-500 text-slate-950 py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition">Verify Password</button>
+        </div>
+
+        <div id="owner-dashboard" class="hidden bg-slate-900/95 backdrop-blur-md border border-white/10 p-6 rounded-2xl shadow-2xl mb-12 space-y-8">
+
+            <div class="bg-slate-950/60 p-4 rounded-xl border border-white/10">
+                <h2 class="text-lg font-black text-amber-400 mb-4 tracking-wider uppercase">➕ Add New Product</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                    <input type="text" id="new-prod-name" placeholder="Product Name" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                    <select id="new-prod-category" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-gray-300">
+                        <option value="garlands">Garlands</option>
+                        <option value="loose flowers">Loose Flowers</option>
+                        <option value="others">Others</option>
+                    </select>
+                    <input type="number" id="new-prod-price" placeholder="Price (₹)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                    <input type="text" id="new-prod-unit" placeholder="Unit (e.g., 1 mura)" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                    <input type="number" id="new-prod-stock" placeholder="Initial Stock Qty" class="bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                    <input type="file" id="new-prod-imgfile" accept="image/*" class="bg-slate-900 border border-white/10 rounded-lg p-2 text-xs text-gray-300">
+                    <input type="text" id="new-prod-desc" placeholder="Short description..." class="sm:col-span-3 bg-slate-900 border border-white/10 rounded-lg p-2 focus:outline-none focus:border-amber-400 text-white">
+                </div>
+                <button id="add-prod-btn" onclick="addNewProduct()" class="w-full mt-3 bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-lg font-bold text-xs uppercase tracking-widest transition shadow-lg">
+                    Save Product to Live Database
+                </button>
+                <p class="text-xs text-gray-500 mt-2">Pick a photo straight from your gallery/files — no need for image links anymore.</p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-black text-amber-400 mb-4 pb-2 border-b border-white/10 uppercase tracking-wider">📋 Catalog & Stock</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr class="bg-white/5 border-b border-white/10 text-xs font-bold text-amber-400 uppercase tracking-wider">
+                                <th class="p-3">Product Details</th>
+                                <th class="p-3 w-24">Price (₹)</th>
+                                <th class="p-3 w-24">Stock</th>
+                                <th class="p-3 text-center w-24">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="divide-y divide-white/5 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-black text-emerald-400 mb-4 pb-2 border-b border-white/10 uppercase tracking-wider">🛒 Order History</h2>
+                <div id="orders-history-container" class="space-y-4 max-h-[32rem] overflow-y-auto pr-2">
+                    <p class="text-gray-400 text-sm italic">No entries saved yet.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="firebase-config.js"></script>
+    <script src="owner.js"></script>
+</body>
+</html>
