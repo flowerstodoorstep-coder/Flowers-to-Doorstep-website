@@ -75,9 +75,14 @@ function showOwnerDashboard() {
         tr.dataset.id = p.id;
         tr.innerHTML = `
             <td class="p-3">
-                <img src="${p.img || 'images/placeholder.jpg'}" class="w-14 h-14 object-cover rounded-lg mb-2" onerror="this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
-                <div class="font-bold text-white">${p.name}</div>
-                <div class="text-xs text-amber-400 font-semibold mb-1">${p.unit}</div>
+                <img src="${p.img || 'images/placeholder.jpg'}" class="w-14 h-14 object-contain bg-slate-800 rounded-lg mb-2" onerror="this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
+                <input type="text" value="${p.name || ''}" data-field="name" placeholder="Name" class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs font-bold text-white focus:border-amber-400 focus:outline-none mb-1">
+                <select data-field="category" class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-amber-400 focus:border-amber-400 focus:outline-none mb-1">
+                    <option value="garlands" ${p.category === 'garlands' ? 'selected' : ''}>Garlands</option>
+                    <option value="loose flowers" ${p.category === 'loose flowers' ? 'selected' : ''}>Loose Flowers</option>
+                    <option value="others" ${p.category === 'others' ? 'selected' : ''}>Others</option>
+                </select>
+                <input type="text" value="${p.unit || ''}" data-field="unit" placeholder="Unit" class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:border-amber-400 focus:outline-none mb-1">
                 <input type="text" value="${p.desc || ''}" data-field="desc" placeholder="Description..." class="w-full bg-slate-950 border border-white/10 rounded px-2 py-1 text-xs text-gray-300 focus:border-amber-400 focus:outline-none mb-1">
                 <input type="file" accept="image/*" data-field="imgfile" class="w-full text-xs text-gray-400">
             </td>
@@ -106,12 +111,19 @@ function showOwnerDashboard() {
         }
 
         if (btn.dataset.action === 'save') {
+            const name = row.querySelector('[data-field="name"]').value.trim();
+            const category = row.querySelector('[data-field="category"]').value;
+            const unit = row.querySelector('[data-field="unit"]').value.trim();
             const desc = row.querySelector('[data-field="desc"]').value.trim();
             const price = Number(row.querySelector('[data-field="price"]').value);
             const stock = Number(row.querySelector('[data-field="stock"]').value);
             const fileInput = row.querySelector('[data-field="imgfile"]');
             const file = fileInput.files[0];
 
+            if (!name || !unit) {
+                alert('⚠️ Name and unit cannot be empty.');
+                return;
+            }
             if (isNaN(price) || isNaN(stock) || price < 0 || stock < 0) {
                 alert('⚠️ Price and stock must be valid numbers.');
                 return;
@@ -121,7 +133,7 @@ function showOwnerDashboard() {
             btn.textContent = file ? 'Uploading…' : 'Saving…';
 
             uploadImageFile(file, (uploadedUrl) => {
-                const updateData = { desc, price, stock };
+                const updateData = { name, category, unit, desc, price, stock };
                 if (uploadedUrl) updateData.img = uploadedUrl;
 
                 db.ref(`catalog/${id}`).update(updateData)
@@ -209,10 +221,21 @@ function renderOrderHistory(ordersData) {
             <div class="text-xs text-emerald-400">📍 ${order.address}</div>
             <div class="text-xs text-gray-400">🚚 Expected delivery: ${order.deliveryDate || '—'}</div>
             <ul class="space-y-1 bg-white/5 p-2 rounded-lg mt-1">${itemsList}</ul>
-            <button data-order-id="${orderId}" data-action="mark-delivered" class="mt-2 w-full text-xs font-bold py-2 rounded-lg transition ${delivered ? 'bg-white/5 text-gray-500 cursor-default' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}" ${delivered ? 'disabled' : ''}>
-                ${delivered ? '✓ Delivered' : 'Mark as Delivered'}
-            </button>`;
+            <div class="flex gap-2 mt-2">
+                <button data-order-id="${orderId}" data-action="mark-delivered" class="flex-1 text-xs font-bold py-2 rounded-lg transition ${delivered ? 'bg-white/5 text-gray-500 cursor-default' : 'bg-emerald-500 hover:bg-emerald-600 text-white'}" ${delivered ? 'disabled' : ''}>
+                    ${delivered ? '✓ Delivered' : 'Mark as Delivered'}
+                </button>
+                <button data-order-id="${orderId}" data-action="remove-order" class="text-xs font-bold text-red-400 hover:text-red-500 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20 transition">Remove</button>
+            </div>`;
         container.appendChild(div);
+    });
+
+    container.querySelectorAll('[data-action="remove-order"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (confirm('🗑️ Permanently remove this order from history?')) {
+                db.ref(`orders/${btn.dataset.orderId}`).remove();
+            }
+        });
     });
 
     container.querySelectorAll('[data-action="mark-delivered"]').forEach(btn => {
