@@ -250,7 +250,7 @@ window.revealUpiId = function() {
     el.classList.remove('hidden');
 };
 
-/* ---------------- Confirm order ---------------- */
+/* ---------------- Confirm order (Optimized Flow) ---------------- */
 window.confirmOrder = function() {
     const area = document.getElementById('delivery-area').value;
     const address = document.getElementById('delivery-address').value.trim();
@@ -281,6 +281,7 @@ window.confirmOrder = function() {
     const pricing = calcPricing(subtotal);
     const deliveryDate = getExpectedDeliveryDate();
 
+    // 1. Prepare structured database order payload
     const logOrderData = {
         name, phone, items: orderItems, address, notes,
         subtotal, discount: pricing.discount, deliveryFee: pricing.deliveryFee, total: pricing.total,
@@ -290,36 +291,93 @@ window.confirmOrder = function() {
         timestamp: new Date().toLocaleString('en-IN')
     };
 
-    if (paymentMethod === 'UPI') {
-        const upiLink = `upi://pay?pa=${encodeURIComponent(OWNER_UPI_ID)}&pn=${encodeURIComponent(OWNER_UPI_NAME)}&am=${pricing.total}&cu=INR&tn=${encodeURIComponent('Order - ' + name)}`;
-        document.getElementById('upi-fallback').classList.remove('hidden');
-        // Top-level navigation is what reliably triggers Android's UPI app chooser
-        // with the amount/payee pre-filled — window.open() often fails silently.
-        window.location.href = upiLink;
+    // 2. Commit stock updates and save order to Firebase FIRST
+    db.ref().update(updates).then(() => {
+        db.ref('orders').push(logOrderData).then(() => {
+            
+            // Format order summary payload for messaging
+            let textPayload = `New Order - Flowers To Doorstep\n\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n`;
+            if (notes) textPayload += `Notes: ${notes}\n`;
+            textPayload += `\nOrder:\n${whatsappOrderList}\nSubtotal: ₹${subtotal}\n`;
+            if (pricing.discount) textPayload += `Discount (10%): -₹${pricing.discount}\n`;
+            textPayload += `Delivery: ${pricing.deliveryFee ? `₹${pricing.deliveryFee}` : 'FREE'}\nTotal: ₹${pricing.total}\nPayment: ${paymentMethod}\nExpected Delivery: ${deliveryDate}`;
+
+            // Reset local shopping cart immediately
+            cart = {};
+            document.getElementById('customer-name').value = '';
+            document.getElementById('customer-phone').value = '';
+            document.getElementById('delivery-address').value = '';
+            document.getElementById('order-notes').value = '';
+            renderProducts();
+            updateBasketFab();
+            closeCartOverlay();
+
+            // 3. Handle Payment Method Routing
+            if (paymentMethod === 'UPI') {
+                // If customer selects UPI, show the interactive QR payment modal directly on-screen
+                showQRModal(pricing.total, textPayload);
+            } else {
+                // For Cash on Delivery (COD), complete the order on-screen and notify
+                showOrderConfirmedPopup(deliveryDate);
+                // Redirect user to Whatsapp automatically to notify the owner of COD
+                window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(textPayload)}`, '_blank');
+            }
+        });
+    }).catch(err => {
+        console.error("Database update failed: ", err);
+        alert("⚠️ Something went wrong recording your order. Please try again.");
+    });
+};
+
+/* ---------------- Interactive QR Code Payment Modal ---------------- */
+window.showQRModal = function(amount, orderDetails) {
+    let qrModal = document.getElementById('qr-payment-modal');
+    if (!qrModal) {
+        qrModal = document.createElement('div');
+        qrModal.id = 'qr-payment-modal';
+        qrModal.className = "fixed inset-0 bg-slate-950/95 flex items-center justify-center p-4 z-50 hidden";
+        qrModal.innerHTML = `
+            <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl">
+                <h3 class="text-xl font-black text-white mb-1">Pay with UPI QR</h3>
+                <p class="text-gray-400 text-xs mb-4">Scan using any UPI App (GPay, PhonePe, Paytm)</p>
+                
+                <div class="bg-white p-3 rounded-xl inline-block mb-4">
+                    <!-- Configured to use your exact QR image filename -->
+                    <img id="qr-modal-image" src="images/UPI%20QR%20-%20Miss%20KAVYASHREE%20R%20%20(1).jpg" alt="Payment QR Code" class="w-48 h-48 mx-auto object-contain" onerror="this.onerror=null;this.src='https://via.placeholder.com/200?text=Scan+to+Pay';">
+                </div>
+                
+                <div class="mb-5">
+                    <span class="text-xs text-gray-400 uppercase tracking-widest block font-semibold">Amount to Pay</span>
+                    <span id="qr-modal-amount" class="text-2xl font-black text-amber-400">₹0</span>
+                </div>
+                
+                <div class="space-y-2">
+                    <button id="qr-payment-done-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-sm transition">
+                        I Have Paid
+                    </button>
+                    <button id="qr-payment-cancel-btn" class="w-full bg-transparent hover:bg-white/5 text-gray-400 py-2.5 rounded-xl text-xs transition">
+                        Close
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(qrModal);
     }
 
-    db.ref().update(updates).then(() => {
-        db.ref('orders').push(logOrderData);
+    // Assign dynamic amount and display modal
+    document.getElementById('qr-modal-amount').innerText = `₹${amount}`;
+    qrModal.classList.remove('hidden');
 
-        let textPayload = `New Order - Flowers To Doorstep\n\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n`;
-        if (notes) textPayload += `Notes: ${notes}\n`;
-        textPayload += `\nOrder:\n${whatsappOrderList}\nSubtotal: ₹${subtotal}\n`;
-        if (pricing.discount) textPayload += `Discount (10%): -₹${pricing.discount}\n`;
-        textPayload += `Delivery: ${pricing.deliveryFee ? `₹${pricing.deliveryFee}` : 'FREE'}\nTotal: ₹${pricing.total}\nPayment: ${paymentMethod}\nExpected Delivery: ${deliveryDate}`;
+    // Trigger confirmation flow upon payment
+    document.getElementById('qr-payment-done-btn').onclick = function() {
+        qrModal.classList.add('hidden');
+        showOrderConfirmedPopup(getExpectedDeliveryDate());
+        // Send order summary payload to WhatsApp for payment reference
+        window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent('Payment Sent For Order:\n\n' + orderDetails)}`, '_blank');
+    };
 
-        cart = {};
-        document.getElementById('customer-name').value = '';
-        document.getElementById('customer-phone').value = '';
-        document.getElementById('delivery-address').value = '';
-        document.getElementById('order-notes').value = '';
-        renderProducts();
-        updateBasketFab();
-        closeCartOverlay();
-
-        window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(textPayload)}`, '_blank');
-
-        showOrderConfirmedPopup(deliveryDate);
-    });
+    document.getElementById('qr-payment-cancel-btn').onclick = function() {
+        qrModal.classList.add('hidden');
+    };
 };
 
 function showOrderConfirmedPopup(deliveryDate) {
@@ -359,8 +417,7 @@ window.searchMyOrders = function() {
             div.innerHTML = `
                 <div class="flex justify-between text-xs text-gray-400 mb-1"><span>${order.timestamp}</span><span class="font-bold text-amber-400">${order.status || 'Placed'}</span></div>
                 <ul class="mb-2">${itemsList}</ul>
-                <div class="text-sm font-bold text-white">Total: ₹${order.total}</div>
-                <div class="text-xs text-emerald-400 mt-1">Expected delivery: ${order.deliveryDate || '—'}</div>`;
+                <div class="text-sm font-bold text-white">Total: ₹${order.total} <span class="text-xs text-gray-400">(${order.paymentMethod})</span></div>`;
             results.appendChild(div);
         });
     });
