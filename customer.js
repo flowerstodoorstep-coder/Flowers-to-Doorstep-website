@@ -83,8 +83,8 @@ function renderProducts() {
                </div>`;
 
         card.innerHTML = `
-            <div class="relative h-48 bg-slate-800 cursor-pointer flex items-center justify-center" onclick="openProductModal('${product.id}')">
-                <img src="${product.img || 'images/placeholder.jpg'}" alt="${product.name}" class="w-full h-full object-contain" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
+            <div class="relative aspect-[3/4] bg-slate-800 cursor-pointer" onclick="openProductModal('${product.id}')">
+                <img src="${product.img || 'images/placeholder.jpg'}" alt="${product.name}" class="w-full h-full object-cover" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
                 ${Number(product.stock) <= 0 ? `<div class="absolute inset-0 bg-black/70 flex items-center justify-center backdrop-blur-sm"><span class="bg-red-600 text-white font-black px-4 py-2 rounded text-xs tracking-widest uppercase border border-red-400">OUT OF STOCK</span></div>` : ''}
             </div>
             <div class="p-4 flex-1 flex flex-col justify-between">
@@ -109,7 +109,7 @@ window.openProductModal = function(productId) {
     const cartQty = cart[p.id] || 0;
     const modal = document.getElementById('product-modal');
     document.getElementById('product-modal-body').innerHTML = `
-        <img src="${p.img || 'images/placeholder.jpg'}" alt="${p.name}" class="w-full h-64 object-contain bg-slate-800 rounded-xl mb-4" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
+        <img src="${p.img || 'images/placeholder.jpg'}" alt="${p.name}" class="w-full aspect-[3/4] object-cover bg-slate-800 rounded-xl mb-4" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1561181286-d3fee7d55364?q=80&w=400';">
         <h2 class="text-2xl font-black text-white">${p.name}</h2>
         <p class="text-amber-400 text-sm font-semibold mt-1">${p.unit}</p>
         <p class="text-gray-300 text-sm mt-3 leading-relaxed">${p.desc || 'Fresh daily morning arrivals.'}</p>
