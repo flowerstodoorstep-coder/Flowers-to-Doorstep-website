@@ -329,49 +329,70 @@ window.confirmOrder = function() {
     });
 };
 
-/* ---------------- Interactive QR Code Payment Modal ---------------- */
+/* ---------------- Interactive QR Code Payment Modal (Updated Dynamic Hybrid) ---------------- */
 window.showQRModal = function(amount, orderDetails) {
+    // 1. Build the dynamic standard UPI URI
+    const payeeName = encodeURIComponent("Flowers To Doorstep");
+    const transactionNote = encodeURIComponent("Flower Order");
+    const upiUri = `upi://pay?pa=${OWNER_UPI_ID}&pn=${payeeName}&am=${amount}&cu=INR&tn=${transactionNote}`;
+
+    // 2. Generate an accurate dynamic QR code using a secure, public QR code generation engine
+    const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
+
     let qrModal = document.getElementById('qr-payment-modal');
     if (!qrModal) {
         qrModal = document.createElement('div');
         qrModal.id = 'qr-payment-modal';
         qrModal.className = "fixed inset-0 bg-slate-950/95 flex items-center justify-center p-4 z-50 hidden";
-        qrModal.innerHTML = `
-            <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl">
-                <h3 class="text-xl font-black text-white mb-1">Pay with UPI QR</h3>
-                <p class="text-gray-400 text-xs mb-4">Scan using any UPI App (GPay, PhonePe, Paytm)</p>
-                
-                <div class="bg-white p-3 rounded-xl inline-block mb-4">
-                    <!-- Configured to use your exact QR image filename -->
-                    <img id="qr-modal-image" src="images/UPI%20QR%20-%20Miss%20KAVYASHREE%20R%20%20(1).jpg" alt="Payment QR Code" class="w-48 h-48 mx-auto object-contain" onerror="this.onerror=null;this.src='https://via.placeholder.com/200?text=Scan+to+Pay';">
-                </div>
-                
-                <div class="mb-5">
-                    <span class="text-xs text-gray-400 uppercase tracking-widest block font-semibold">Amount to Pay</span>
-                    <span id="qr-modal-amount" class="text-2xl font-black text-amber-400">₹0</span>
-                </div>
-                
-                <div class="space-y-2">
-                    <button id="qr-payment-done-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-sm transition">
-                        I Have Paid
-                    </button>
-                    <button id="qr-payment-cancel-btn" class="w-full bg-transparent hover:bg-white/5 text-gray-400 py-2.5 rounded-xl text-xs transition">
-                        Close
-                    </button>
-                </div>
-            </div>`;
         document.body.appendChild(qrModal);
     }
 
-    // Assign dynamic amount and display modal
-    document.getElementById('qr-modal-amount').innerText = `₹${amount}`;
+    // 3. Render modern responsive UI supporting both One-Tap app launch (Mobile) and QR scanning (Desktop/Tablet)
+    qrModal.innerHTML = `
+        <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl">
+            <h3 class="text-xl font-black text-white mb-1">Pay with UPI</h3>
+            <p class="text-gray-400 text-xs mb-4">Tap the button to open UPI Apps or scan the QR code below</p>
+            
+            <!-- Mobile deep-linking button (auto-opens GPay, PhonePe, Paytm, BHIM with dynamic details filled) -->
+            <a href="${upiUri}" class="w-full flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-sm transition shadow-lg mb-4">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"></path>
+                </svg>
+                Pay via UPI App
+            </a>
+
+            <div class="relative flex items-center justify-center my-2">
+                <span class="absolute bg-slate-900 px-3 text-gray-500 text-xs uppercase font-bold tracking-wider">Or Scan QR</span>
+                <hr class="w-full border-white/10">
+            </div>
+
+            <!-- Dynamic QR Code Container -->
+            <div class="bg-white p-3 rounded-xl inline-block my-4">
+                <img id="qr-modal-image" src="${qrCodeApiUrl}" alt="Payment QR Code" class="w-44 h-44 mx-auto object-contain">
+            </div>
+            
+            <div class="mb-5">
+                <span class="text-xs text-gray-400 uppercase tracking-widest block font-semibold">Amount to Pay</span>
+                <span id="qr-modal-amount" class="text-2xl font-black text-amber-400">₹${amount}</span>
+            </div>
+            
+            <div class="space-y-2">
+                <button id="qr-payment-done-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-sm transition">
+                    I Have Paid
+                </button>
+                <button id="qr-payment-cancel-btn" class="w-full bg-transparent hover:bg-white/5 text-gray-400 py-2.5 rounded-xl text-xs transition">
+                    Close
+                </button>
+            </div>
+        </div>`;
+
     qrModal.classList.remove('hidden');
 
-    // Trigger confirmation flow upon payment
+    // Trigger confirmation flow upon completion
     document.getElementById('qr-payment-done-btn').onclick = function() {
         qrModal.classList.add('hidden');
         showOrderConfirmedPopup(getExpectedDeliveryDate());
-        // Send order summary payload to WhatsApp for payment reference
+        // Redirect client to WhatsApp for sending proof / payment acknowledgment text
         window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent('Payment Sent For Order:\n\n' + orderDetails)}`, '_blank');
     };
 
