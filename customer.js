@@ -1,3 +1,10 @@
+/* ---------------- Global Configurations ---------------- */
+// Updated with your official merchant UPI and business WhatsApp details!
+const OWNER_UPI_ID = "Q057425255@ybl"; 
+const MERCHANT_NAME = "Bablu groceries";
+const OWNER_WHATSAPP = "919704978710"; // Your updated business WhatsApp!
+const FREE_DELIVERY_THRESHOLD = 150; 
+
 const FALLBACK_SEEDS = [
     { id: "prod_1", name: 'Rose', price: 80, unit: '100 grams loose', category: 'loose flowers', stock: 15, desc: 'Fresh bright red aromatic loose roses for daily pooja arrangements.', img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400' },
     { id: "prod_2", name: 'White Shevanti', price: 60, unit: '100 grams loose', category: 'loose flowers', stock: 5, desc: 'Crisp handpicked traditional white chrysanthemums.', img: 'https://images.unsplash.com/photo-1567306226416-28f0efdc88ce?q=80&w=400' },
@@ -32,6 +39,21 @@ setTimeout(() => {
     const bg = document.getElementById('bg-image');
     if (bg) bg.style.backgroundImage = "url('images/hero-background.jpg')";
 }, 500);
+
+/* ---------------- Helper Pricing Calculator ---------------- */
+function calcPricing(subtotal) {
+    if (subtotal >= FREE_DELIVERY_THRESHOLD) {
+        const discount = Math.round(subtotal * 0.10);
+        return { subtotal, discount, deliveryFee: 0, total: subtotal - discount, qualifies: true };
+    }
+    return { subtotal, discount: 0, deliveryFee: 29, total: subtotal + 29, qualifies: false };
+}
+
+function getExpectedDeliveryDate() {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' }) + " (6:00 AM - 9:00 AM)";
+}
 
 /* ---------------- Category tabs ---------------- */
 window.selectCategory = function(category) {
@@ -244,12 +266,6 @@ window.validateAreaSelection = function() {
     }
 };
 
-window.revealUpiId = function() {
-    const el = document.getElementById('upi-id-display');
-    el.textContent = OWNER_UPI_ID;
-    el.classList.remove('hidden');
-};
-
 /* ---------------- Confirm order (Optimized Flow) ---------------- */
 window.confirmOrder = function() {
     const area = document.getElementById('delivery-area').value;
@@ -314,12 +330,11 @@ window.confirmOrder = function() {
 
             // 3. Handle Payment Method Routing
             if (paymentMethod === 'UPI') {
-                // If customer selects UPI, show the interactive QR payment modal directly on-screen
+                // Show verified merchant payment window
                 showQRModal(pricing.total, textPayload);
             } else {
-                // For Cash on Delivery (COD), complete the order on-screen and notify
+                // COD payment flow
                 showOrderConfirmedPopup(deliveryDate);
-                // Redirect user to Whatsapp automatically to notify the owner of COD
                 window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(textPayload)}`, '_blank');
             }
         });
@@ -329,19 +344,15 @@ window.confirmOrder = function() {
     });
 };
 
-/* ---------------- Interactive QR Code Payment Modal (With Policy Fallback) ---------------- */
+/* ---------------- Verified Merchant UPI Payment Modal ---------------- */
 window.showQRModal = function(amount, orderDetails) {
-    // 1. Build standard UPI URI
-    const payeeName = encodeURIComponent("Kavyashree R");
-    const transactionNote = encodeURIComponent("Flower Order");
-    const upiUri = `upi://pay?pa=${OWNER_UPI_ID}&pn=${payeeName}&am=${amount}&cu=INR&tn=${transactionNote}`;
+    // Build standard, bank-friendly Merchant UPI URI
+    const encodedMerchantName = encodeURIComponent(MERCHANT_NAME);
+    const transactionNote = encodeURIComponent("Flower Delivery");
+    const upiUri = `upi://pay?pa=${OWNER_UPI_ID}&pn=${encodedMerchantName}&am=${amount}&cu=INR&tn=${transactionNote}`;
 
-    // 2. Dynamic QR code URL
+    // Dynamic clean QR code generator
     const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
-
-    // 3. Extract mobile number from UPI ID if it starts with digits (e.g., 8095759538)
-    const rawPhoneMatch = OWNER_UPI_ID.match(/^\d+/);
-    const upiPhoneNumber = rawPhoneMatch ? rawPhoneMatch[0] : "";
 
     let qrModal = document.getElementById('qr-payment-modal');
     if (!qrModal) {
@@ -351,50 +362,31 @@ window.showQRModal = function(amount, orderDetails) {
         document.body.appendChild(qrModal);
     }
 
-    // 4. Render modernized UI with fallback options for UPI Risk Policies
+    // Rendered clean layout optimized for trusted business payments
     qrModal.innerHTML = `
-        <div class="bg-slate-900 border border-white/10 rounded-2xl p-5 w-full max-w-sm text-center shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 class="text-lg font-black text-white mb-1">Pay with UPI</h3>
-            <p class="text-gray-400 text-xs mb-3">Amount to pay: <span class="text-amber-400 font-bold text-sm">₹${amount}</span></p>
+        <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl overflow-y-auto max-h-[90vh]">
+            <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20 font-bold tracking-widest uppercase">
+                ✓ Verified UPI Merchant
+            </span>
+            <h3 class="text-xl font-black text-white mt-3">${MERCHANT_NAME}</h3>
+            <p class="text-gray-400 text-xs mb-4">Amount to pay: <span class="text-amber-400 font-bold text-sm">₹${amount}</span></p>
             
-            <!-- Method 1: Tap to open app directly -->
-            <a href="${upiUri}" class="w-full flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 py-2.5 rounded-xl font-bold tracking-wider text-xs transition shadow-lg mb-2.5">
+            <!-- Mobile Tap to Pay Button -->
+            <a href="${upiUri}" class="w-full flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-xs transition shadow-lg mb-3">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"></path>
                 </svg>
-                1. Tap to Pay via App
+                Tap to Pay via UPI App
             </a>
 
-            <!-- Method 2: Copy UPI ID (Highly reliable fallback if app link gets blocked) -->
-            <button id="copy-upi-btn" class="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-2.5 rounded-xl font-bold text-xs transition border border-white/10 mb-3">
-                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2H14"></path>
-                </svg>
-                <span>2. Copy UPI ID</span>
-            </button>
-
-            <!-- Method 3: Mobile Number Search Helper -->
-            ${upiPhoneNumber ? `
-            <div class="bg-slate-950/60 border border-white/5 p-2 rounded-xl text-left mb-3">
-                <span class="text-[10px] text-gray-500 uppercase tracking-widest block font-bold">3. Pay via Mobile Number</span>
-                <div class="flex justify-between items-center mt-1">
-                    <span class="text-sm font-mono text-white font-bold">${upiPhoneNumber}</span>
-                    <span class="text-[10px] bg-amber-400/10 text-amber-400 px-2 py-0.5 rounded border border-amber-400/20 font-semibold">Paytm/GPay</span>
-                </div>
-            </div>
-            ` : ''}
-
-            <!-- Dynamic QR Code -->
-            <div class="bg-white p-2 rounded-xl inline-block mb-3">
-                <img id="qr-modal-image" src="${qrCodeApiUrl}" alt="Payment QR Code" class="w-36 h-36 mx-auto object-contain">
+            <!-- Dynamic QR Code (Perfect for Desktop/Tablet customers) -->
+            <div class="bg-white p-3 rounded-2xl inline-block mb-3 shadow-inner">
+                <img id="qr-modal-image" src="${qrCodeApiUrl}" alt="Merchant Payment QR" class="w-44 h-44 mx-auto object-contain">
             </div>
 
-            <!-- Risk Policy Notice -->
-            <div class="bg-red-500/10 border border-red-500/20 rounded-xl p-2.5 mb-4 text-left">
-                <p class="text-[10px] text-red-200 leading-normal">
-                    ⚠️ <b>Bank Declining?</b> UPI security rules sometimes block automated website checkouts. If payment fails, please <b>Copy the UPI ID</b> above or enter the <b>Phone Number</b> manually in your favorite app!
-                </p>
-            </div>
+            <p class="text-gray-500 text-[10px] px-2 mb-5">
+                Scan using Google Pay, PhonePe, Paytm, or BHIM to instantly secure your order delivery.
+            </p>
             
             <div class="space-y-2">
                 <button id="qr-payment-done-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-xs transition">
@@ -408,25 +400,7 @@ window.showQRModal = function(amount, orderDetails) {
 
     qrModal.classList.remove('hidden');
 
-    // Add Copy Button functionality
-    const copyBtn = document.getElementById('copy-upi-btn');
-    copyBtn.onclick = function() {
-        navigator.clipboard.writeText(OWNER_UPI_ID).then(() => {
-            const label = copyBtn.querySelector('span');
-            label.innerText = "UPI ID Copied!";
-            copyBtn.classList.remove('bg-slate-800');
-            copyBtn.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
-            setTimeout(() => {
-                label.innerText = "2. Copy UPI ID";
-                copyBtn.classList.add('bg-slate-800');
-                copyBtn.classList.remove('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
-            }, 2000);
-        }).catch(err => {
-            alert(`UPI ID: ${OWNER_UPI_ID}`);
-        });
-    };
-
-    // Trigger confirmation flow upon completion
+    // Proceed to confirmation upon tapping 'I Have Paid'
     document.getElementById('qr-payment-done-btn').onclick = function() {
         qrModal.classList.add('hidden');
         showOrderConfirmedPopup(getExpectedDeliveryDate());
