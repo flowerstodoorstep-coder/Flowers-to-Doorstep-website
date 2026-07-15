@@ -1,9 +1,13 @@
-/* ---------------- Global Configurations ---------------- */
-// Updated with your official merchant UPI and business WhatsApp details!
+// customer.js
+
+/* ---------------- Global Business Configurations ---------------- */
 const OWNER_UPI_ID = "Q057425255@ybl"; 
-const MERCHANT_NAME = "Bablu groceries";
-const OWNER_WHATSAPP = "919704978710"; // Your updated business WhatsApp!
-const FREE_DELIVERY_THRESHOLD = 150; 
+const MERCHANT_NAME = "Flowers to Doorstep";
+const OWNER_WHATSAPP = "919704978710"; 
+const FREE_DELIVERY_THRESHOLD = 200; 
+const DELIVERY_FEE = 20;
+const DISCOUNT_RATE = 0.10;
+const ORDER_CUTOFF_HOUR = 22; // 10 PM
 
 const FALLBACK_SEEDS = [
     { id: "prod_1", name: 'Rose', price: 80, unit: '100 grams loose', category: 'loose flowers', stock: 15, desc: 'Fresh bright red aromatic loose roses for daily pooja arrangements.', img: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=400' },
@@ -13,55 +17,65 @@ const FALLBACK_SEEDS = [
     { id: "prod_5", name: 'Shevanti Garland', price: 60, unit: '1 mura', category: 'garlands', stock: 4, desc: 'Dense thick yellow chrysanthemums woven tightly for deity frames.', img: 'https://images.unsplash.com/photo-1526047932273-341f2a7631f9?q=80&w=400' }
 ];
 
-let products = [];
+let products = [...FALLBACK_SEEDS];
 let cart = {};
 let selectedCategory = 'all';
 
-db.ref('catalog').once('value', snap => {
-    if (!snap.exists()) {
-        const seedMap = {};
-        FALLBACK_SEEDS.forEach(p => { seedMap[p.id] = p; });
-        db.ref('catalog').set(seedMap);
-    }
+// Initialize setup on load
+document.addEventListener('DOMContentLoaded', () => {
+    renderProducts();
+    initFirebaseSync();
 });
 
-db.ref('catalog').on('value', snap => {
-    try {
-        const data = snap.val();
-        products = data
-            ? Object.keys(data).filter(k => data[k]).map(k => ({ id: k, ...data[k] }))
-            : [];
-        renderProducts();
-    } catch (e) { console.error(e); }
-});
-
-setTimeout(() => {
-    const bg = document.getElementById('bg-image');
-    if (bg) bg.style.backgroundImage = "url('images/hero-background.jpg')";
-}, 500);
-
-/* ---------------- Helper Pricing Calculator ---------------- */
-function calcPricing(subtotal) {
-    if (subtotal >= FREE_DELIVERY_THRESHOLD) {
-        const discount = Math.round(subtotal * 0.10);
-        return { subtotal, discount, deliveryFee: 0, total: subtotal - discount, qualifies: true };
+// Sync catalog with live Realtime Database
+function initFirebaseSync() {
+    if (typeof db === 'undefined') {
+        console.warn("Database engine not detected. Running on local fallback seeds.");
+        return;
     }
-    return { subtotal, discount: 0, deliveryFee: 29, total: subtotal + 29, qualifies: false };
+
+    db.ref('catalog').once('value', snap => {
+        if (!snap.exists()) {
+            const seedMap = {};
+            FALLBACK_SEEDS.forEach(p => { seedMap[p.id] = p; });
+            db.ref('catalog').set(seedMap);
+        }
+    });
+
+    db.ref('catalog').on('value', snap => {
+        try {
+            const data = snap.val();
+            products = data
+                ? Object.keys(data).filter(k => data[k]).map(k => ({ id: k, ...data[k] }))
+                : [];
+            renderProducts();
+        } catch (e) { 
+            console.error("Firebase syncing failed: ", e); 
+        }
+    });
 }
 
+/* ---------------- Helper Pricing & Delivery Calculators ---------------- */
 function getExpectedDeliveryDate() {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return tomorrow.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' }) + " (6:00 AM - 9:00 AM)";
+    const now = new Date();
+    const cutoff = new Date(now);
+    cutoff.setHours(ORDER_CUTOFF_HOUR, 0, 0, 0);
+    const deliveryDate = new Date(now);
+    deliveryDate.setDate(deliveryDate.getDate() + (now <= cutoff ? 1 : 2));
+    return deliveryDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' }) + " (6:00 AM - 9:00 AM)";
+}
+
+function calcPricing(subtotal) {
+    const qualifies = subtotal >= FREE_DELIVERY_THRESHOLD;
+    const discount = qualifies ? Math.round(subtotal * DISCOUNT_RATE) : 0;
+    const deliveryFee = qualifies ? 0 : DELIVERY_FEE;
+    const total = subtotal - discount + deliveryFee;
+    return { subtotal, discount, deliveryFee, total, qualifies };
 }
 
 /* ---------------- Category tabs ---------------- */
 window.selectCategory = function(category) {
     selectedCategory = category;
-    const bg = document.getElementById('bg-image');
-    if (bg) {
-        bg.className = "fixed inset-0 bg-cover bg-center transition-all duration-700 ease-in-out z-0 scale-105 opacity-20 blur-md";
-    }
     updateNavUI();
     renderProducts();
 };
@@ -155,14 +169,14 @@ window.closeProductModal = function() {
     modal.classList.remove('flex');
 };
 
-/* ---------------- Cart ---------------- */
+/* ---------------- Cart & Checkout Management ---------------- */
 window.addToCart = function(productId, change) {
     const item = products.find(p => p && p.id === productId);
     const currentQty = cart[productId] || 0;
     const targetQty = currentQty + change;
 
     if (targetQty > Number(item.stock)) {
-        alert(`⚠️ Cannot add more! Only ${item.stock} units remain available in stock.`);
+        alert(`⚠️ Cannot add more! Only ${item.stock} units remain in stock.`);
         return;
     }
     if (targetQty <= 0) delete cart[productId];
@@ -266,7 +280,14 @@ window.validateAreaSelection = function() {
     }
 };
 
-/* ---------------- Confirm order (Optimized Flow) ---------------- */
+/* ---------------- UPI Fallback Handlers ---------------- */
+window.revealUpiId = function() {
+    const display = document.getElementById('upi-id-display');
+    display.innerText = OWNER_UPI_ID;
+    display.classList.toggle('hidden');
+};
+
+/* ---------------- Confirm order (Dynamic Online/Offline Flow) ---------------- */
 window.confirmOrder = function() {
     const area = document.getElementById('delivery-area').value;
     const address = document.getElementById('delivery-address').value.trim();
@@ -297,7 +318,7 @@ window.confirmOrder = function() {
     const pricing = calcPricing(subtotal);
     const deliveryDate = getExpectedDeliveryDate();
 
-    // 1. Prepare structured database order payload
+    // 1. Database structural payload
     const logOrderData = {
         name, phone, items: orderItems, address, notes,
         subtotal, discount: pricing.discount, deliveryFee: pricing.deliveryFee, total: pricing.total,
@@ -307,51 +328,52 @@ window.confirmOrder = function() {
         timestamp: new Date().toLocaleString('en-IN')
     };
 
-    // 2. Commit stock updates and save order to Firebase FIRST
-    db.ref().update(updates).then(() => {
-        db.ref('orders').push(logOrderData).then(() => {
-            
-            // Format order summary payload for messaging
-            let textPayload = `New Order - Flowers To Doorstep\n\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n`;
-            if (notes) textPayload += `Notes: ${notes}\n`;
-            textPayload += `\nOrder:\n${whatsappOrderList}\nSubtotal: ₹${subtotal}\n`;
-            if (pricing.discount) textPayload += `Discount (10%): -₹${pricing.discount}\n`;
-            textPayload += `Delivery: ${pricing.deliveryFee ? `₹${pricing.deliveryFee}` : 'FREE'}\nTotal: ₹${pricing.total}\nPayment: ${paymentMethod}\nExpected Delivery: ${deliveryDate}`;
+    const processOrderLocally = () => {
+        // Build order text payload
+        let textPayload = `New Order - Flowers To Doorstep\n\nName: ${name}\nPhone: ${phone}\nAddress: ${address}\n`;
+        if (notes) textPayload += `Notes: ${notes}\n`;
+        textPayload += `\nOrder:\n${whatsappOrderList}\nSubtotal: ₹${subtotal}\n`;
+        if (pricing.discount) textPayload += `Discount (10%): -₹${pricing.discount}\n`;
+        textPayload += `Delivery: ${pricing.deliveryFee ? `₹${pricing.deliveryFee}` : 'FREE'}\nTotal: ₹${pricing.total}\nPayment: ${paymentMethod}\nExpected Delivery: ${deliveryDate}`;
 
-            // Reset local shopping cart immediately
-            cart = {};
-            document.getElementById('customer-name').value = '';
-            document.getElementById('customer-phone').value = '';
-            document.getElementById('delivery-address').value = '';
-            document.getElementById('order-notes').value = '';
-            renderProducts();
-            updateBasketFab();
-            closeCartOverlay();
+        // Reset local cart instantly
+        cart = {};
+        document.getElementById('customer-name').value = '';
+        document.getElementById('customer-phone').value = '';
+        document.getElementById('delivery-address').value = '';
+        document.getElementById('order-notes').value = '';
+        renderProducts();
+        updateBasketFab();
+        closeCartOverlay();
 
-            // 3. Handle Payment Method Routing
-            if (paymentMethod === 'UPI') {
-                // Show verified merchant payment window
-                showQRModal(pricing.total, textPayload);
-            } else {
-                // COD payment flow
-                showOrderConfirmedPopup(deliveryDate);
-                window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(textPayload)}`, '_blank');
-            }
+        if (paymentMethod === 'UPI') {
+            showQRModal(pricing.total, textPayload);
+        } else {
+            showOrderConfirmedPopup(deliveryDate);
+            window.open(`https://wa.me/${OWNER_WHATSAPP}?text=${encodeURIComponent(textPayload)}`, '_blank');
+        }
+    };
+
+    // 2. Commit to database if online, else safely process locally to ensure transaction happens
+    if (typeof db !== 'undefined') {
+        db.ref().update(updates).then(() => {
+            db.ref('orders').push(logOrderData).then(() => {
+                processOrderLocally();
+            });
+        }).catch(err => {
+            console.error("Database update failed, processing fallback direct layout...", err);
+            processOrderLocally(); 
         });
-    }).catch(err => {
-        console.error("Database update failed: ", err);
-        alert("⚠️ Something went wrong recording your order. Please try again.");
-    });
+    } else {
+        processOrderLocally();
+    }
 };
 
 /* ---------------- Verified Merchant UPI Payment Modal ---------------- */
 window.showQRModal = function(amount, orderDetails) {
-    // Build standard, bank-friendly Merchant UPI URI
     const encodedMerchantName = encodeURIComponent(MERCHANT_NAME);
     const transactionNote = encodeURIComponent("Flower Delivery");
     const upiUri = `upi://pay?pa=${OWNER_UPI_ID}&pn=${encodedMerchantName}&am=${amount}&cu=INR&tn=${transactionNote}`;
-
-    // Dynamic clean QR code generator
     const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(upiUri)}`;
 
     let qrModal = document.getElementById('qr-payment-modal');
@@ -362,7 +384,6 @@ window.showQRModal = function(amount, orderDetails) {
         document.body.appendChild(qrModal);
     }
 
-    // Rendered clean layout optimized for trusted business payments
     qrModal.innerHTML = `
         <div class="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl overflow-y-auto max-h-[90vh]">
             <span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20 font-bold tracking-widest uppercase">
@@ -371,7 +392,6 @@ window.showQRModal = function(amount, orderDetails) {
             <h3 class="text-xl font-black text-white mt-3">${MERCHANT_NAME}</h3>
             <p class="text-gray-400 text-xs mb-4">Amount to pay: <span class="text-amber-400 font-bold text-sm">₹${amount}</span></p>
             
-            <!-- Mobile Tap to Pay Button -->
             <a href="${upiUri}" class="w-full flex items-center justify-center gap-2 bg-amber-400 hover:bg-amber-500 text-slate-950 py-3 rounded-xl font-bold tracking-wider text-xs transition shadow-lg mb-3">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"></path>
@@ -379,7 +399,6 @@ window.showQRModal = function(amount, orderDetails) {
                 Tap to Pay via UPI App
             </a>
 
-            <!-- Dynamic QR Code (Perfect for Desktop/Tablet customers) -->
             <div class="bg-white p-3 rounded-2xl inline-block mb-3 shadow-inner">
                 <img id="qr-modal-image" src="${qrCodeApiUrl}" alt="Merchant Payment QR" class="w-44 h-44 mx-auto object-contain">
             </div>
@@ -400,7 +419,6 @@ window.showQRModal = function(amount, orderDetails) {
 
     qrModal.classList.remove('hidden');
 
-    // Proceed to confirmation upon tapping 'I Have Paid'
     document.getElementById('qr-payment-done-btn').onclick = function() {
         qrModal.classList.add('hidden');
         showOrderConfirmedPopup(getExpectedDeliveryDate());
@@ -422,7 +440,7 @@ window.closeConfirmedModal = function() {
     modal.classList.add('hidden'); modal.classList.remove('flex');
 };
 
-/* ---------------- My Orders (lookup by phone) ---------------- */
+/* ---------------- My Orders Lookup ---------------- */
 window.openMyOrders = function() {
     const modal = document.getElementById('my-orders-modal');
     modal.classList.remove('hidden'); modal.classList.add('flex');
@@ -438,19 +456,23 @@ window.searchMyOrders = function() {
     if (!phone) { results.innerHTML = `<p class="text-gray-400 text-sm italic">Enter the phone number you used while ordering.</p>`; return; }
     results.innerHTML = `<p class="text-gray-400 text-sm italic">Searching…</p>`;
 
-    db.ref('orders').orderByChild('phone').equalTo(phone).once('value', snap => {
-        const data = snap.val();
-        if (!data) { results.innerHTML = `<p class="text-gray-400 text-sm italic">No orders found for this number.</p>`; return; }
-        results.innerHTML = '';
-        Object.values(data).reverse().forEach(order => {
-            const itemsList = order.items.map(i => `<li class="text-xs text-gray-300">• ${i.name} x ${i.qty}</li>`).join('');
-            const div = document.createElement('div');
-            div.className = "bg-slate-900 border border-white/10 rounded-xl p-4 mb-3";
-            div.innerHTML = `
-                <div class="flex justify-between text-xs text-gray-400 mb-1"><span>${order.timestamp}</span><span class="font-bold text-amber-400">${order.status || 'Placed'}</span></div>
-                <ul class="mb-2">${itemsList}</ul>
-                <div class="text-sm font-bold text-white">Total: ₹${order.total} <span class="text-xs text-gray-400">(${order.paymentMethod})</span></div>`;
-            results.appendChild(div);
+    if (typeof db !== 'undefined') {
+        db.ref('orders').orderByChild('phone').equalTo(phone).once('value', snap => {
+            const data = snap.val();
+            if (!data) { results.innerHTML = `<p class="text-gray-400 text-sm italic">No orders found for this number.</p>`; return; }
+            results.innerHTML = '';
+            Object.values(data).reverse().forEach(order => {
+                const itemsList = order.items.map(i => `<li class="text-xs text-gray-300">• ${i.name} x ${i.qty}</li>`).join('');
+                const div = document.createElement('div');
+                div.className = "bg-slate-900 border border-white/10 rounded-xl p-4 mb-3";
+                div.innerHTML = `
+                    <div class="flex justify-between text-xs text-gray-400 mb-1"><span>${order.timestamp}</span><span class="font-bold text-amber-400">${order.status || 'Placed'}</span></div>
+                    <ul class="mb-2">${itemsList}</ul>
+                    <div class="text-sm font-bold text-white">Total: ₹${order.total} <span class="text-xs text-gray-400">(${order.paymentMethod})</span></div>`;
+                results.appendChild(div);
+            });
         });
-    });
+    } else {
+        results.innerHTML = `<p class="text-gray-400 text-sm italic">Database engine unavailable. Unable to pull history.</p>`;
+    }
 };
